@@ -1,5 +1,5 @@
 {
-  "name": "ainconv-discord",
+  "name": "aintools-discord",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
