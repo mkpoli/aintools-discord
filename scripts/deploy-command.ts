@@ -1,5 +1,7 @@
 import { REST, Routes } from "discord.js";
 
+import { logger } from "../utils/logging";
+
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
@@ -12,7 +14,9 @@ if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
 
 import commands from "../commands";
 
-const commandsData = commands.map((command) => command.data.toJSON());
+const commandsData = [...commands.values()].map((command) =>
+	command.data.toJSON(),
+);
 
 const rest = new REST().setToken(TOKEN);
 
@@ -32,9 +36,7 @@ interface Command {
 
 (async () => {
 	try {
-		console.log(
-			`Started refreshing ${commands.length} application (/) commands.`,
-		);
+		logger.info`Started refreshing ${commands.size} application (/) commands.`;
 
 		// const result = await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commandsData });
 		const result = (await rest.put(
@@ -43,10 +45,8 @@ interface Command {
 				body: commandsData,
 			},
 		)) as Command[];
-		console.log(
-			`Successfully reloaded ${result.length} application (/) commands.`,
-		);
-	} catch (error) {
-		console.error(error);
+		logger.info`Successfully reloaded ${result.length} application (/) commands.`;
+	} catch (error: unknown) {
+		logger.error(error instanceof Error ? error.message : "Unknown error");
 	}
 })();

@@ -1,5 +1,18 @@
-import ping from "./utility/ping.js";
-import user from "./utility/user.js";
-import server from "./utility/server.js";
+import type {
+	CommandInteraction,
+	SlashCommandOptionsOnlyBuilder,
+} from "discord.js";
 
-export default [ping, user, server];
+import kana from "./conversion/kana.js";
+import ping from "./utility/ping.js";
+import server from "./utility/server.js";
+import user from "./utility/user.js";
+
+export type Command = {
+	data: SlashCommandOptionsOnlyBuilder;
+	execute: (interaction: CommandInteraction) => Promise<void>;
+};
+
+export default new Map<string, Command>(
+	[ping, user, server, kana].map((command) => [command.data.name, command]),
+);
