@@ -1,5 +1,6 @@
 import { convert } from "ainconv";
 import { type CommandInteraction, SlashCommandBuilder } from "discord.js";
+import { convertSentence } from "../../utils/ainu";
 import { logger } from "../../utils/logging";
 
 export default {
@@ -15,7 +16,9 @@ export default {
 	async execute(interaction: CommandInteraction) {
 		const message = interaction.options.get("message");
 		const before = message?.value?.toString();
-		const result = convert(before ?? "", undefined, "Kana");
+		const result = convertSentence(before ?? "", (word) =>
+			convert(word, undefined, "Kana"),
+		);
 
 		logger.info("[Command : {name}] {before} -> {after}", {
 			name: interaction.commandName,
