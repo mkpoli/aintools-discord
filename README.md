@@ -10,7 +10,7 @@
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create a bot in the application
 3. Copy the bot token
-4. Set the bot token as the `DISCORD_TOKEN` environment variable
+4. Set the bot token as the `DISCORD_TOKEN`, application ID as `DISCORD_APPLICATION_ID`, and guild ID as `DISCORD_GUILD_ID` environment variables
 5. Run the bot with `bun start`
 
 ## Development
