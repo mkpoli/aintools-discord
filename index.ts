@@ -1,15 +1,7 @@
-import {
-	Client,
-	Collection,
-	type CommandInteraction,
-	Events,
-	GatewayIntentBits,
-	InteractionType,
-	type SlashCommandBuilder,
-} from "discord.js";
-import ping from "./commands/utility/ping.js";
-import server from "./commands/utility/server.js";
-import user from "./commands/utility/user.js";
+import { Client, Events, GatewayIntentBits, InteractionType } from "discord.js";
+
+import commands from "./commands";
+
 import { logger } from "./utils/logging";
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -21,18 +13,6 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.login(TOKEN);
-
-const commands = new Collection<
-	string,
-	{
-		data: SlashCommandBuilder;
-		execute: (interaction: CommandInteraction) => Promise<void>;
-	}
->();
-
-commands.set(ping.data.name, ping);
-commands.set(user.data.name, user);
-commands.set(server.data.name, server);
 
 client.on(Events.InteractionCreate, async (interaction) => {
 	if (!interaction.isCommand()) {
