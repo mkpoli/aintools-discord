@@ -3,7 +3,10 @@ import type {
 	SlashCommandOptionsOnlyBuilder,
 } from "discord.js";
 
+import cyrl from "./conversion/cyrl.js";
 import kana from "./conversion/kana.js";
+import latn from "./conversion/latn.js";
+
 import ping from "./utility/ping.js";
 import server from "./utility/server.js";
 import user from "./utility/user.js";
@@ -14,5 +17,8 @@ export type Command = {
 };
 
 export default new Map<string, Command>(
-	[ping, user, server, kana].map((command) => [command.data.name, command]),
+	[ping, user, server, kana, latn, cyrl].map((command) => [
+		command.data.name,
+		command,
+	]),
 );
