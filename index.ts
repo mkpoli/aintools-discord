@@ -1,20 +1,23 @@
 import {
 	Client,
-	GatewayIntentBits,
-	Events,
 	Collection,
-	type SlashCommandBuilder,
 	type CommandInteraction,
+	Events,
+	GatewayIntentBits,
+	InteractionType,
+	type SlashCommandBuilder,
 } from "discord.js";
 import ping from "./commands/utility/ping.js";
-import user from "./commands/utility/user.js";
 import server from "./commands/utility/server.js";
+import user from "./commands/utility/user.js";
+import { logger } from "./utils/logging";
+
 const TOKEN = process.env.DISCORD_TOKEN;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.once(Events.ClientReady, (c) => {
-	console.log(`Ready! Logged in as ${c.user.tag}`);
+	logger.info`Ready! Logged in as ${c.user.tag}`;
 });
 
 client.login(TOKEN);
@@ -32,7 +35,17 @@ commands.set(user.data.name, user);
 commands.set(server.data.name, server);
 
 client.on(Events.InteractionCreate, async (interaction) => {
-	if (!interaction.isCommand()) return;
+	if (!interaction.isCommand()) {
+		logger.info("Interaction : {type}", {
+			type: InteractionType[interaction.type],
+		});
+		return;
+	}
+
+	logger.info("Interaction : {type} : {detail}", {
+		type: InteractionType[interaction.type],
+		detail: interaction.commandName,
+	});
 
 	const command = commands.get(interaction.commandName);
 

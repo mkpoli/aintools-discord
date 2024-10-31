@@ -11,6 +11,7 @@
 		"typescript": "^5.0.0"
 	},
 	"dependencies": {
+		"@logtape/logtape": "^0.7.1",
 		"ainconv": "^0.2.1",
 		"discord.js": "^14.16.3"
 	},
