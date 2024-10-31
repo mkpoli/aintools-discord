@@ -1,15 +1,21 @@
 # ainconv-discord
 
-To install dependencies:
+## Installation
+
+### Use the hosted bot
+* [Add the running BOT to Discord](https://discord.com/oauth2/authorize?client_id=1301574269704081568&permissions=0&integration_type=0&scope=bot+applications.commands)
+
+### Self-host the bot
+
+1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a bot in the application
+3. Copy the bot token
+4. Set the bot token as the `DISCORD_TOKEN` environment variable
+5. Run the bot with `bun start`
+
+## Development
 
 ```bash
-bun install
+bun i
+bun start
 ```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.1.31. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
