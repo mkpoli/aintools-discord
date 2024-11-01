@@ -11,6 +11,7 @@ if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
 }
 
 import commands from "../commands";
+import { logger } from "../utils/logging";
 
 const commandsData = [...commands.values()].map((command) =>
 	command.data.toJSON(),
@@ -34,25 +35,44 @@ interface Command {
 
 (async () => {
 	try {
-		console.log(
-			`Started refreshing ${commands.size} application (/) commands.`,
+		logger.info(
+			"[reset-commands] Started refreshing {count} application (/) commands.",
+			{
+				count: commands.size,
+			},
 		);
 
 		rest
 			.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: [] })
-			.then(() => console.log("Successfully deleted all guild commands."))
-			.catch(console.error);
+			.then(() =>
+				logger.info(
+					"[reset-commands] Successfully deleted all guild commands.",
+				),
+			)
+			.catch((error) =>
+				logger.error("[reset-commands] Failed to delete all guild commands.", {
+					error: error instanceof Error ? error.message : error,
+				}),
+			);
 
 		rest
 			.put(Routes.applicationCommands(CLIENT_ID), { body: commandsData })
-			.then(() => console.log("Successfully deleted all application commands."))
-			.catch(console.error);
-		// // const result = await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commandsData });
-		// const result = (await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
-		//   body: commandsData,
-		// })) as Command[];
-		// console.log(`Successfully reloaded ${result.length} application (/) commands.`);
+			.then(() =>
+				logger.info(
+					"[reset-commands] Successfully reloaded all application commands.",
+				),
+			)
+			.catch((error) =>
+				logger.error(
+					"[reset-commands] Failed to reload all application commands.",
+					{
+						error: error instanceof Error ? error.message : error,
+					},
+				),
+			);
 	} catch (error) {
-		console.error(error);
+		logger.error("[reset-commands] Failed to reset commands.", {
+			error: error instanceof Error ? error.message : error,
+		});
 	}
 })();

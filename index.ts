@@ -16,13 +16,13 @@ client.login(TOKEN);
 
 client.on(Events.InteractionCreate, async (interaction) => {
 	if (!interaction.isCommand()) {
-		logger.info("Interaction : {type}", {
+		logger.info("[Interaction : {type}]", {
 			type: InteractionType[interaction.type],
 		});
 		return;
 	}
 
-	logger.info("Interaction : {type} : {detail}", {
+	logger.info("[Interaction : {type}] {detail}", {
 		type: InteractionType[interaction.type],
 		detail: interaction.commandName,
 	});
@@ -34,6 +34,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	try {
 		await command.execute(interaction);
 	} catch (error) {
-		console.error(error);
+		logger.error("[Interaction : {type}] {detail} -> {error}", {
+			type: InteractionType[interaction.type],
+			detail: interaction.commandName,
+			error: error instanceof Error ? error.message : error,
+		});
 	}
 });
