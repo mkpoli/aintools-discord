@@ -16,7 +16,7 @@
 
 #### With Docker
 1. Install and Setup Docker
-2. Run the bot with `docker compose up`
+2. Run the bot with `docker compose up -d`
 
 #### Without Docker
 
