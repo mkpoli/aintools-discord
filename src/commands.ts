@@ -79,4 +79,12 @@ export const commands = [
 			"Boolean",
 		),
 	),
+	new Command(
+		"ask",
+		"Ask a grounded question — answered only from cited glossary/corpus/mdb sources",
+	).options(
+		new Option("question", "Your question (max 300 characters)", "String")
+			.required()
+			.max_length(300),
+	),
 ];

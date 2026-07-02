@@ -1,5 +1,6 @@
 import { DiscordHono } from "discord-hono";
 import { analyzeHandler } from "./handlers/analyze.js";
+import { askHandler } from "./handlers/ask.js";
 import { convert, convertScriptContextMenu } from "./handlers/convert.js";
 import { corpusHandler } from "./handlers/corpus.js";
 import { glossaryAutocomplete, glossaryHandler } from "./handlers/glossary.js";
@@ -29,5 +30,6 @@ app.command("quiz", safeHandler(quiz));
 // is typed for CommandContext only.
 app.component("quiz", quizAnswer);
 app.component("quiz-next", quizNext);
+app.command("ask", safeHandler(askHandler));
 
 export default app;
