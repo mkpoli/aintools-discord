@@ -25,7 +25,11 @@
 		"GLOSSARY_API_URL": "https://itak.aynu.org/api/gdoc",
 		// Empty ⇒ WOTD cron no-ops safely (set once a post channel is chosen).
 		"WOTD_CHANNEL_ID": "",
-		"AI_GATEWAY_ID": "aintools-discord",
+		// Empty ⇒ env.AI.run is called directly with no gateway hop (the gateway
+		// is optional observability, never a hard dependency). To enable request
+		// logging/caching for /ask, create an AI Gateway named "aintools-discord"
+		// in the dashboard and set this to its id.
+		"AI_GATEWAY_ID": "",
 		"ASK_MODEL": "@cf/openai/gpt-oss-120b",
 		"ASK_COOLDOWN_SECONDS": "300"
 	},
@@ -57,10 +61,14 @@
 		}
 	],
 
+	// Workers AI — /ask grounded Q&A. Routed through AI Gateway only when
+	// AI_GATEWAY_ID (above) is set.
+	"ai": {
+		"binding": "AI"
+	},
+
 	// Word-of-the-day post, daily at 22:00 UTC = 07:00 JST. Handler: src/cron/wotd.ts.
 	"triggers": {
 		"crons": ["0 22 * * *"]
 	}
-
-	// ai binding lands in its own feature PR (see rewrite plan PR sequence).
 }
