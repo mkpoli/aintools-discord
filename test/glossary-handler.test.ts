@@ -12,10 +12,13 @@ import {
 import { safeHandler } from "../src/lib/errors.js";
 
 const GLOSSARY_URL = "https://itak.aynu.org/api/gdoc";
-const glossaryCommand = commands.find(
-	(command) => command.toJSON().name === "glossary",
-);
-if (!glossaryCommand) throw new Error("glossary command not registered");
+const glossaryCommand = (() => {
+	const found = commands.find(
+		(command) => command.toJSON().name === "glossary",
+	);
+	if (!found) throw new Error("glossary command not registered");
+	return found;
+})();
 
 interface InteractionResponseBody {
 	type: number;
