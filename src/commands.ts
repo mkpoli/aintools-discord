@@ -67,6 +67,12 @@ export const commands = [
 			.min_value(1)
 			.max_value(10),
 	),
+	new Command(
+		"lookup",
+		"Look up an Ainu word: glossary, morphemes, corpus examples & scripts",
+	).options(
+		new Option("word", "Word to look up (any script)", "String").required(),
+	),
 	new Command("quiz", "Practice Ainu vocab & sentences.").options(
 		new Option("mode", "Question type — omit for a mix of both").choices(
 			{ name: "Vocab", value: "vocab" },
