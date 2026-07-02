@@ -1,5 +1,6 @@
 import { DiscordHono } from "discord-hono";
 import { commands } from "./commands.js";
+import { analyzeHandler } from "./handlers/analyze.js";
 import { corpusHandler } from "./handlers/corpus.js";
 import { type AppEnv, safeHandler } from "./lib/errors.js";
 
@@ -13,5 +14,6 @@ app.command(
 );
 
 app.command("corpus", safeHandler(corpusHandler));
+app.command("analyze", safeHandler(analyzeHandler));
 
 export default app;

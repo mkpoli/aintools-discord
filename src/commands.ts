@@ -24,4 +24,16 @@ export const commands = [
 			.min_value(1)
 			.max_value(10),
 	),
+	new Command("analyze", "Decompose Ainu word(s) into morphemes").options(
+		new Option(
+			"text",
+			"Word(s) to analyze, up to 8 (Ainu)",
+			"String",
+		).required(),
+		new Option("mode", "Decomposition view (default: flat)", "String").choices(
+			{ name: "flat", value: "flat" },
+			{ name: "first", value: "first" },
+			{ name: "nested", value: "nested" },
+		),
+	),
 ];

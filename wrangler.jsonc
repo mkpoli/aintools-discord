@@ -30,10 +30,13 @@
 		"ASK_COOLDOWN_SECONDS": "300"
 	},
 
-	// Worker-to-Worker binding — no public hop for corpus.aynu.org reads.
-	// services/http.ts falls back to a plain fetch against CORPUS_API_URL
-	// when this binding isn't present (e.g. `wrangler dev` without --remote).
-	"services": [{ "binding": "CORPUS", "service": "ainu-corpora-api" }]
+	// Worker-to-Worker bindings — no public hop for corpus.aynu.org / mdb.aynu.org
+	// reads. services/http.ts falls back to a plain fetch against *_API_URL
+	// when a binding isn't present (e.g. `wrangler dev` without --remote).
+	"services": [
+		{ "binding": "CORPUS", "service": "ainu-corpora-api" },
+		{ "binding": "MDB", "service": "ainu-mdb" }
+	]
 
 	// kv_namespaces / d1_databases / ai / triggers land in their respective
 	// feature PRs (see rewrite plan PR sequence).
