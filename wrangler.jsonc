@@ -47,15 +47,20 @@
 		}
 	],
 
-	// Quiz scores + streaks (PR-6); schema in migrations/0001_quiz.sql.
+	// Quiz scores + streaks (PR-6, migrations/0001_quiz.sql); WOTD post history
+	// (PR-7, migrations/0002_wotd.sql).
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "aintools-discord",
 			"database_id": "074720f5-9667-47cc-b213-4e530e9fb9ac"
 		}
-	]
+	],
 
-	// ai / triggers land in their respective
-	// feature PRs (see rewrite plan PR sequence).
+	// Word-of-the-day post, daily at 22:00 UTC = 07:00 JST. Handler: src/cron/wotd.ts.
+	"triggers": {
+		"crons": ["0 22 * * *"]
+	}
+
+	// ai binding lands in its own feature PR (see rewrite plan PR sequence).
 }
