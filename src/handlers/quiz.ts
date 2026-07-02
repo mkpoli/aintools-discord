@@ -8,6 +8,7 @@ import {
 	describeAnswer,
 	encodePayload,
 	generateQuestion,
+	isQuizMode,
 	parsePayload,
 	type QuizKind,
 	type QuizMode,
@@ -57,10 +58,6 @@ function messageInvokerId(message: {
 	return message.interaction_metadata?.user?.id;
 }
 
-function kindToMode(kind: QuizKind): QuizMode {
-	return kind.startsWith("vocab") ? "vocab" : "sentence";
-}
-
 const KIND_TITLES: Record<QuizKind, string> = {
 	"vocab-l2g": "🧠 意味は？ / What does this mean?",
 	"vocab-g2l": "🧠 単語は？ / Which word is this?",
@@ -76,11 +73,18 @@ function questionEmbed(question: QuizQuestion) {
 	return baseEmbed().title(KIND_TITLES[question.kind]).description(description);
 }
 
-function questionComponents(question: QuizQuestion) {
+/** `mode` is the session mode, threaded through so "Next ▶" keeps a mixed session mixed. */
+function questionComponents(question: QuizQuestion, mode: QuizMode) {
 	return new Components().row(
 		...question.choices.map((label, i) =>
 			new Button("quiz", truncateLabel(label), "Secondary").custom_value(
-				encodePayload(question.kind, question.itemId, i, question.correctIndex),
+				encodePayload(
+					question.kind,
+					question.itemId,
+					i,
+					question.correctIndex,
+					mode,
+				),
 			),
 		),
 	);
@@ -173,7 +177,7 @@ export async function quiz(c: CommandContext<AppEnv>) {
 	const question = generateQuestion(course, mode, Math.random);
 	return c.res({
 		embeds: [questionEmbed(question)],
-		components: questionComponents(question),
+		components: questionComponents(question, mode),
 	});
 }
 
@@ -197,7 +201,7 @@ async function handleQuizAnswer(c: ComponentContext<AppEnv>) {
 	} catch {
 		return c.flags("EPHEMERAL").res(BROKEN_BUTTON);
 	}
-	const { kind, itemId, chosenIndex, correctIndex } = payload;
+	const { kind, itemId, chosenIndex, correctIndex, mode } = payload;
 	const correct = chosenIndex === correctIndex;
 	const reveal = describeAnswer(course, kind, itemId);
 
@@ -233,11 +237,13 @@ async function handleQuizAnswer(c: ComponentContext<AppEnv>) {
 
 	return c.update().res({
 		embeds: [embed],
-		components: nextComponents(kindToMode(kind)),
+		// The payload carries the original /quiz session mode, so a mixed
+		// session keeps generating mixed questions forever.
+		components: nextComponents(mode),
 	});
 }
 
-/** "Next ▶" — a fresh question in the same mode family, same invoker gate as the answer handler. */
+/** "Next ▶" — a fresh question in the original session mode, same invoker gate as the answer handler. */
 function handleQuizNext(c: ComponentContext<AppEnv>) {
 	const invoker = messageInvokerId(c.interaction.message);
 	const clicker = actorId(c.interaction);
@@ -245,14 +251,12 @@ function handleQuizNext(c: ComponentContext<AppEnv>) {
 		return c.flags("EPHEMERAL").res(NOT_YOUR_QUIZ);
 	}
 
-	const mode: QuizMode =
-		c.ref.custom_value === "vocab" || c.ref.custom_value === "sentence"
-			? c.ref.custom_value
-			: "mixed";
+	const raw = c.ref.custom_value ?? "";
+	const mode: QuizMode = isQuizMode(raw) ? raw : "mixed";
 	const question = generateQuestion(course, mode, Math.random);
 	return c.update().res({
 		embeds: [questionEmbed(question)],
-		components: questionComponents(question),
+		components: questionComponents(question, mode),
 	});
 }
 

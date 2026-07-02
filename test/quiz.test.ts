@@ -252,34 +252,58 @@ describe("generateQuestion — sanity over the real vendored course", () => {
 });
 
 describe("payload codec", () => {
-	it("round-trips through encode/parse", () => {
-		const payload = encodePayload("vocab-l2g", "v_irankarapte", 2, 0);
+	it("round-trips through encode/parse, including the session mode", () => {
+		const payload = encodePayload("vocab-l2g", "v_irankarapte", 2, 0, "mixed");
 		expect(parsePayload(payload)).toEqual({
 			kind: "vocab-l2g",
 			itemId: "v_irankarapte",
 			chosenIndex: 2,
 			correctIndex: 0,
+			mode: "mixed",
 		});
 	});
 
+	it("round-trips every mode value", () => {
+		for (const mode of ["vocab", "sentence", "mixed"] as const) {
+			const payload = encodePayload("sentence-blank", "s_001", 1, 3, mode);
+			expect(parsePayload(payload).mode).toBe(mode);
+		}
+	});
+
+	it("stays well under the custom_id budget for every real item id", () => {
+		const ids = [
+			...realCourse.vocab.map((v) => v.id),
+			...realCourse.sentences.map((s) => s.id),
+		];
+		for (const id of ids) {
+			const payload = encodePayload("sentence-blank", id, 3, 3, "sentence");
+			expect(payload.length).toBeLessThanOrEqual(80);
+		}
+	});
+
 	it("never contains ';' — discord-hono's CUSTOM_ID_SEPARATOR", () => {
-		const payload = encodePayload("sentence-blank", "s_001", 3, 1);
+		const payload = encodePayload("sentence-blank", "s_001", 3, 1, "sentence");
 		expect(payload.includes(";")).toBe(false);
 	});
 
 	it("rejects a payload containing ';'", () => {
-		expect(() => parsePayload("vocab-l2g:v_x:0;0")).toThrow();
+		expect(() => parsePayload("vocab-l2g:v_x:0;0:mixed")).toThrow();
 	});
 
-	it("rejects malformed payloads (wrong field count, unknown kind, non-integer indices)", () => {
+	it("rejects the old 4-segment payload shape (pre-mode)", () => {
+		expect(() => parsePayload("vocab-l2g:v_x:0:0")).toThrow();
+	});
+
+	it("rejects malformed payloads (wrong field count, unknown kind/mode, non-integer indices)", () => {
 		expect(() => parsePayload("vocab-l2g:v_x:0")).toThrow();
-		expect(() => parsePayload("vocab-l2g:v_x:0:0:0")).toThrow();
-		expect(() => parsePayload("not-a-kind:v_x:0:0")).toThrow();
-		expect(() => parsePayload("vocab-l2g:v_x:a:0")).toThrow();
+		expect(() => parsePayload("vocab-l2g:v_x:0:0:mixed:extra")).toThrow();
+		expect(() => parsePayload("not-a-kind:v_x:0:0:mixed")).toThrow();
+		expect(() => parsePayload("vocab-l2g:v_x:0:0:not-a-mode")).toThrow();
+		expect(() => parsePayload("vocab-l2g:v_x:a:0:mixed")).toThrow();
 	});
 
 	it("encodePayload refuses fields containing the field separator", () => {
-		expect(() => encodePayload("vocab-l2g", "v:x", 0, 0)).toThrow();
+		expect(() => encodePayload("vocab-l2g", "v:x", 0, 0, "mixed")).toThrow();
 	});
 });
 

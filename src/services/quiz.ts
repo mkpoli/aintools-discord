@@ -259,17 +259,26 @@ export function describeAnswer(
 
 // --- Button custom_value codec -------------------------------------------
 //
-// Payload shape: `kind:itemId:chosenIndex:correctIndex`. Never contains
-// ";" — discord-hono reserves that character to separate the component key
-// from its custom_value (CUSTOM_ID_SEPARATOR).
+// Payload shape: `kind:itemId:chosenIndex:correctIndex:mode`. The trailing
+// `mode` is the session mode the user picked at `/quiz` time, threaded
+// through every answer button so "Next ▶" can keep a `mixed` session mixed.
+// Never contains ";" — discord-hono reserves that character to separate the
+// component key from its custom_value (CUSTOM_ID_SEPARATOR).
 
 const FIELD_SEP = ":";
+
+const QUIZ_MODES: readonly QuizMode[] = ["vocab", "sentence", "mixed"];
+
+export function isQuizMode(value: string): value is QuizMode {
+	return (QUIZ_MODES as readonly string[]).includes(value);
+}
 
 export interface QuizPayload {
 	kind: QuizKind;
 	itemId: string;
 	chosenIndex: number;
 	correctIndex: number;
+	mode: QuizMode;
 }
 
 export function encodePayload(
@@ -277,15 +286,16 @@ export function encodePayload(
 	itemId: string,
 	chosenIndex: number,
 	correctIndex: number,
+	mode: QuizMode,
 ): string {
-	for (const field of [kind, itemId]) {
+	for (const field of [kind, itemId, mode]) {
 		if (field.includes(FIELD_SEP) || field.includes(";")) {
 			throw new Error(
 				`quiz payload field ${JSON.stringify(field)} must not contain "${FIELD_SEP}" or ";"`,
 			);
 		}
 	}
-	return [kind, itemId, String(chosenIndex), String(correctIndex)].join(
+	return [kind, itemId, String(chosenIndex), String(correctIndex), mode].join(
 		FIELD_SEP,
 	);
 }
@@ -295,12 +305,13 @@ export function parsePayload(payload: string): QuizPayload {
 		throw new Error("invalid quiz payload: must not contain ';'");
 	}
 	const parts = payload.split(FIELD_SEP);
-	if (parts.length !== 4) {
+	if (parts.length !== 5) {
 		throw new Error(
-			`invalid quiz payload: expected 4 fields, got ${parts.length}`,
+			`invalid quiz payload: expected 5 fields, got ${parts.length}`,
 		);
 	}
-	const [kind, itemId, chosenIndexStr, correctIndexStr] = parts as [
+	const [kind, itemId, chosenIndexStr, correctIndexStr, mode] = parts as [
+		string,
 		string,
 		string,
 		string,
@@ -309,6 +320,8 @@ export function parsePayload(payload: string): QuizPayload {
 	if (!isQuizKind(kind))
 		throw new Error(`invalid quiz payload: unknown kind ${kind}`);
 	if (!itemId) throw new Error("invalid quiz payload: empty itemId");
+	if (!isQuizMode(mode))
+		throw new Error(`invalid quiz payload: unknown mode ${mode}`);
 
 	const chosenIndex = Number(chosenIndexStr);
 	const correctIndex = Number(correctIndexStr);
@@ -317,5 +330,5 @@ export function parsePayload(payload: string): QuizPayload {
 			"invalid quiz payload: chosenIndex/correctIndex must be integers",
 		);
 	}
-	return { kind, itemId, chosenIndex, correctIndex };
+	return { kind, itemId, chosenIndex, correctIndex, mode };
 }
