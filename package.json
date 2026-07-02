@@ -7,7 +7,7 @@
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
 		"register": "bun --env-file=.dev.vars scripts/register.ts",
-		"register:prod": "REGISTER_SCOPE=global bun --env-file=.dev.vars scripts/register.ts",
+		"register:prod": "REGISTER_SCOPE=global bun --env-file=.env.prod scripts/register.ts",
 		"test": "bun test",
 		"check": "biome check --write .",
 		"typecheck": "wrangler types && tsc --noEmit",
