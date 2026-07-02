@@ -1,7 +1,13 @@
 import type { CommandContext } from "discord-hono";
 
-/** The shape every command handler runs against — see worker-configuration.d.ts. */
-export type AppEnv = { Bindings: Env };
+/**
+ * The shape every command handler runs against — see worker-configuration.d.ts.
+ * `Variables: Record<string, unknown>` is required so `c.var.<option>` type-checks:
+ * without it, `CommandContext<E>`'s `var` resolves to the near-empty
+ * `ContextVariableMap` (discord-hono ties option typing to `createFactory`
+ * generics per-command, which this codebase doesn't use — see commands.ts).
+ */
+export type AppEnv = { Bindings: Env; Variables: Record<string, unknown> };
 
 /**
  * Thrown by service-layer HTTP calls (corpus/mdb/glossary, added in later
