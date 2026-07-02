@@ -8,14 +8,14 @@
 		"enabled": true
 	},
 
-	// Custom domain, flipped on at cutover (PR-9) once the old docker-compose bot
-	// is ready to retire. Until then the workers.dev URL is the staging endpoint.
-	// "routes": [
-	// 	{
-	// 		"pattern": "bot.aynu.org",
-	// 		"custom_domain": true
-	// 	}
-	// ], // enable at cutover (PR-9)
+	// Production interactions endpoint. The workers.dev URL stays usable as a
+	// staging endpoint for a second (dev) Discord application.
+	"routes": [
+		{
+			"pattern": "bot.aynu.org",
+			"custom_domain": true
+		}
+	],
 
 	// Non-secret config. Secrets (DISCORD_TOKEN, DISCORD_PUBLIC_KEY,
 	// DISCORD_APPLICATION_ID) are set via `wrangler secret put`.

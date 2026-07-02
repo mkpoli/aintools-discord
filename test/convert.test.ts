@@ -12,7 +12,13 @@ import { safeHandler } from "../src/lib/errors.js";
 // app wiring — mirrors discord-hono's own test suite (DiscordHono({ verify })
 // + app.fetch()), following the pattern PR-0 established for /ping.
 
-const [, convertCommand, convertContextMenu] = commands;
+const findCommand = (name: string) => {
+	const found = commands.find((command) => command.toJSON().name === name);
+	if (!found) throw new Error(`${name} command not registered`);
+	return found;
+};
+const convertCommand = findCommand("convert");
+const convertContextMenu = findCommand("Convert script");
 
 const env = {
 	CORPUS_API_URL: "https://corpus.aynu.org",

@@ -23,9 +23,21 @@ Discord ── HTTPS interactions ──> Worker "aintools-discord" (bot.aynu.or
                                     └─ Cron (word-of-the-day)
 ```
 
-Feature commands land one at a time in follow-up PRs (see "Status" below) —
-this scaffold only wires up the Worker, a temporary `/ping` health check, and
-command registration.
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/convert text [to] [from]` | Convert Ainu text between Latin, Katakana, Cyrillic, and Hangul (`ainconv`) |
+| `Convert script` (right-click a message → Apps) | Ephemeral all-scripts view of any message |
+| `/corpus query [lang] [mode] [dialect] [limit]` | Aligned AIN⇄JP corpus search or KWIC concordance |
+| `/glossary query [limit]` | Search the itak.aynu.org glossary (with autocomplete) |
+| `/analyze text [mode]` | Morpheme decomposition per word via mdb.aynu.org |
+| `/lookup word` | One-stop research: glossary + morphemes + corpus examples + scripts |
+| `/quiz [mode] [stats]` | Vocab/sentence quiz with D1-backed scores and streaks |
+| `/ask question` | Draft-labeled Q&A grounded in glossary/corpus/morpheme sources (Workers AI) |
+
+A word-of-the-day embed is posted daily at 07:00 JST to `WOTD_CHANNEL_ID`
+(cron `0 22 * * *` UTC); leave the var empty to disable.
 
 ## Dev setup
 
@@ -80,17 +92,26 @@ bun run typecheck   # wrangler types && tsc --noEmit
 bun test
 ```
 
-## Cutover
+## Cutover checklist
 
-Once a feature PR reaches parity with the old bot and staging has been
-verified end to end:
+The `routes` block in `wrangler.jsonc` is live (`bot.aynu.org`). Remaining
+steps, in order — items marked **owner** are performed only by the owner:
 
-1. Implementer uncomments the `routes` block in `wrangler.jsonc` (currently
-   commented out — see the `// enable at cutover (PR-9)` note), deploys to
-   production, sets the three secrets (`DISCORD_TOKEN`, `DISCORD_PUBLIC_KEY`,
-   `DISCORD_APPLICATION_ID`) with `wrangler secret put`, runs
-   `bun run register:prod`, and cleans the old guild-scoped commands
-   (`REGISTER_SCOPE=clean-guild`, pointed at the *old* guild).
-2. **Owner** sets the Interactions Endpoint URL on the production Discord
-   application to `https://bot.aynu.org` and retires the old docker-compose
-   bot. The implementer never shuts down the old bot — only the owner does.
+1. Verify every command end to end in staging (second Discord app + test
+   guild, `bun run register`, tunnel or workers.dev endpoint).
+2. Set the three production secrets: `wrangler secret put DISCORD_TOKEN` /
+   `DISCORD_PUBLIC_KEY` / `DISCORD_APPLICATION_ID` (values from the
+   production application `1301574269704081568`).
+3. `bun run deploy` — creates the `bot.aynu.org` custom domain on first
+   deploy; then `wrangler d1 migrations apply aintools-discord --remote`.
+4. Create `.env.prod` (production app id + token) and `bun run register:prod`
+   to register the commands globally. Clean the leftover guild-scoped
+   commands from the old bot:
+   `REGISTER_SCOPE=clean-guild DISCORD_TEST_GUILD_ID=<old guild> bun run register`.
+5. **Owner:** in the Discord developer portal, set the production app's
+   Interactions Endpoint URL to `https://bot.aynu.org` (Discord verifies with
+   a PING — do this only after step 3 succeeds).
+6. **Owner:** retire the old docker-compose gateway bot.
+7. Optional: set `WOTD_CHANNEL_ID` (word-of-the-day channel) and create an
+   AI Gateway named per `AI_GATEWAY_ID` for `/ask` observability; both are
+   safe no-ops while unset.
