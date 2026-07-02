@@ -36,8 +36,17 @@
 	"services": [
 		{ "binding": "CORPUS", "service": "ainu-corpora-api" },
 		{ "binding": "MDB", "service": "ainu-mdb" }
+	],
+
+	// Glossary stale-while-revalidate cache (key "glossary:v1"); reused by
+	// /ask cooldowns in a later PR.
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "19c3ae65776d40338bf281b5b577738c"
+		}
 	]
 
-	// kv_namespaces / d1_databases / ai / triggers land in their respective
+	// d1_databases / ai / triggers land in their respective
 	// feature PRs (see rewrite plan PR sequence).
 }

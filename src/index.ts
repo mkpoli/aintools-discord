@@ -2,6 +2,7 @@ import { DiscordHono } from "discord-hono";
 import { analyzeHandler } from "./handlers/analyze.js";
 import { convert, convertScriptContextMenu } from "./handlers/convert.js";
 import { corpusHandler } from "./handlers/corpus.js";
+import { glossaryAutocomplete, glossaryHandler } from "./handlers/glossary.js";
 import { type AppEnv, safeHandler } from "./lib/errors.js";
 
 const app = new DiscordHono<AppEnv>();
@@ -16,5 +17,10 @@ app.command("convert", safeHandler(convert));
 app.command("Convert script", safeHandler(convertScriptContextMenu));
 app.command("corpus", safeHandler(corpusHandler));
 app.command("analyze", safeHandler(analyzeHandler));
+app.autocomplete(
+	"glossary",
+	glossaryAutocomplete,
+	safeHandler(glossaryHandler),
+);
 
 export default app;
