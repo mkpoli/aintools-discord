@@ -1,4 +1,5 @@
 import { DiscordHono } from "discord-hono";
+import { runWotd } from "./cron/wotd.js";
 import { analyzeHandler } from "./handlers/analyze.js";
 import { convert, convertScriptContextMenu } from "./handlers/convert.js";
 import { corpusHandler } from "./handlers/corpus.js";
@@ -31,5 +32,8 @@ app.command("quiz", safeHandler(quiz));
 // is typed for CommandContext only.
 app.component("quiz", quizAnswer);
 app.component("quiz-next", quizNext);
+// Empty string matches any cron trigger not otherwise registered — the only
+// one configured is wrangler.jsonc's "0 22 * * *" (word-of-the-day, 07:00 JST).
+app.cron("", runWotd);
 
 export default app;
