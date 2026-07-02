@@ -28,8 +28,17 @@
 		"AI_GATEWAY_ID": "aintools-discord",
 		"ASK_MODEL": "@cf/openai/gpt-oss-120b",
 		"ASK_COOLDOWN_SECONDS": "300"
-	}
+	},
 
-	// kv_namespaces / d1_databases / ai / services / triggers land in their
-	// respective feature PRs (see rewrite plan PR sequence).
+	// Quiz scores + streaks (PR-6); schema in migrations/0001_quiz.sql.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "aintools-discord",
+			"database_id": "074720f5-9667-47cc-b213-4e530e9fb9ac"
+		}
+	]
+
+	// kv_namespaces / ai / services / triggers land in their respective
+	// feature PRs (see rewrite plan PR sequence).
 }
