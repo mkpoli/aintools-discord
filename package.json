@@ -15,6 +15,7 @@
 		"migrate:remote": "wrangler d1 migrations apply aintools-discord --remote"
 	},
 	"dependencies": {
+		"ainconv": "^0.5.1",
 		"discord-hono": "^0.21.2"
 	},
 	"devDependencies": {
