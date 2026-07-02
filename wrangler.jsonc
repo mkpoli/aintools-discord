@@ -45,8 +45,17 @@
 			"binding": "KV",
 			"id": "19c3ae65776d40338bf281b5b577738c"
 		}
+	],
+
+	// Quiz scores + streaks (PR-6); schema in migrations/0001_quiz.sql.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "aintools-discord",
+			"database_id": "074720f5-9667-47cc-b213-4e530e9fb9ac"
+		}
 	]
 
-	// d1_databases / ai / triggers land in their respective
+	// ai / triggers land in their respective
 	// feature PRs (see rewrite plan PR sequence).
 }

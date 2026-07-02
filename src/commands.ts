@@ -67,4 +67,16 @@ export const commands = [
 			.min_value(1)
 			.max_value(10),
 	),
+	new Command("quiz", "Practice Ainu vocab & sentences.").options(
+		new Option("mode", "Question type — omit for a mix of both").choices(
+			{ name: "Vocab", value: "vocab" },
+			{ name: "Sentence", value: "sentence" },
+			{ name: "Mixed", value: "mixed" },
+		),
+		new Option(
+			"stats",
+			"Show your quiz stats instead of a new question",
+			"Boolean",
+		),
+	),
 ];
