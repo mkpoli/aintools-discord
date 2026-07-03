@@ -8,6 +8,7 @@ import { glossaryAutocomplete, glossaryHandler } from "./handlers/glossary.js";
 import { lookupHandler } from "./handlers/lookup.js";
 import { quiz, quizAnswer, quizNext } from "./handlers/quiz.js";
 import { type AppEnv, safeHandler } from "./lib/errors.js";
+import { runArchive } from "./services/archive.js";
 
 const app = new DiscordHono<AppEnv>();
 
@@ -29,8 +30,12 @@ app.component("quiz", quizAnswer);
 app.component("quiz-next", quizNext);
 app.command("ask", safeHandler(askHandler));
 
-// Empty string matches any cron trigger not otherwise registered — the only
-// one configured is wrangler.jsonc's "0 22 * * *" (word-of-the-day, 07:00 JST).
-app.cron("", runWotd);
+// Explicit cron keys — must match wrangler.jsonc's triggers.crons exactly,
+// one handler per trigger. (Previously a single `app.cron("", runWotd)`
+// catch-all matched every trigger; that would have silently routed the new
+// archive trigger into the WOTD handler too, so this PR switched to explicit
+// keys before adding the second cron.)
+app.cron("0 22 * * *", runWotd);
+app.cron("*/10 * * * *", runArchive);
 
 export default app;

@@ -1,8 +1,12 @@
 /**
- * Word-of-the-day cron: `app.cron("", runWotd)` in src/index.ts, triggered
- * `0 22 * * *` (07:00 JST) per wrangler.jsonc. The whole pick/filter/probe
- * algorithm is decomposed into pure functions (unit-tested in
- * test/wotd-pick.test.ts) around a thin I/O shell (`runWotd`) that:
+ * Word-of-the-day cron: `app.cron("0 22 * * *", runWotd)` in src/index.ts,
+ * triggered `0 22 * * *` (07:00 JST) per wrangler.jsonc, dispatched by
+ * explicit cron key. (A second trigger — the message archive crawler — was
+ * added alongside this one; a bare `app.cron("", handler)` catch-all would
+ * have silently matched both, so both are now registered by their exact
+ * cron string.) The whole pick/filter/probe algorithm is decomposed into
+ * pure functions (unit-tested in test/wotd-pick.test.ts) around a thin I/O
+ * shell (`runWotd`) that:
  *
  *  1. no-ops if `WOTD_CHANNEL_ID` is unset (safe until a post channel is chosen)
  *  2. no-ops if today (JST) already has a `posted=1` row in `wotd_history`
