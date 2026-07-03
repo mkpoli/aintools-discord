@@ -64,7 +64,7 @@ function canonicalField(
 	const { analysis } = result;
 	const value = `${analysis.surface_parts.join("-")}\n-# ${analysis.source} · confidence ${analysis.confidence.toFixed(2)}`;
 	return {
-		name: truncate(`**${token}**`, FIELD_NAME_LIMIT),
+		name: `**${truncate(token, FIELD_NAME_LIMIT - 4)}**`,
 		value: truncate(value, FIELD_VALUE_LIMIT),
 	};
 }
@@ -83,7 +83,7 @@ function fallbackField(
 	if (result.warnings.length > 0)
 		lines.push(`-# ${result.warnings.join("; ")}`);
 	return {
-		name: truncate(`**${token}**`, FIELD_NAME_LIMIT),
+		name: `**${truncate(token, FIELD_NAME_LIMIT - 4)}**`,
 		value: truncate(lines.join("\n"), FIELD_VALUE_LIMIT),
 	};
 }
@@ -100,7 +100,7 @@ export function tokenField(
 ): EmbedField {
 	if (settled.status === "rejected") {
 		return {
-			name: truncate(`**${token}**`, FIELD_NAME_LIMIT),
+			name: `**${truncate(token, FIELD_NAME_LIMIT - 4)}**`,
 			value: "(unavailable)",
 		};
 	}

@@ -191,7 +191,7 @@ export async function quiz(c: CommandContext<AppEnv>) {
 async function handleQuizAnswer(c: ComponentContext<AppEnv>) {
 	const invoker = messageInvokerId(c.interaction.message);
 	const clicker = actorId(c.interaction);
-	if (invoker && clicker !== invoker) {
+	if (!invoker || clicker !== invoker) {
 		return c.flags("EPHEMERAL").res(NOT_YOUR_QUIZ);
 	}
 
@@ -247,7 +247,7 @@ async function handleQuizAnswer(c: ComponentContext<AppEnv>) {
 function handleQuizNext(c: ComponentContext<AppEnv>) {
 	const invoker = messageInvokerId(c.interaction.message);
 	const clicker = actorId(c.interaction);
-	if (invoker && clicker !== invoker) {
+	if (!invoker || clicker !== invoker) {
 		return c.flags("EPHEMERAL").res(NOT_YOUR_QUIZ);
 	}
 

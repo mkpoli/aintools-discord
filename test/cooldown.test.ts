@@ -30,6 +30,24 @@ class MemoryKV {
 }
 
 describe("checkAndSetCooldown", () => {
+	test("short cooldowns clamp the KV TTL up to the 60s floor (put would throw below it)", async () => {
+		const puts: { expirationTtl?: number }[] = [];
+		const kv = {
+			get: async () => null,
+			put: async (
+				_key: string,
+				_value: string,
+				options?: { expirationTtl?: number },
+			) => {
+				puts.push(options ?? {});
+			},
+		};
+		const remaining = await checkAndSetCooldown(kv, "ask:cooldown:u1", 10);
+		expect(remaining).toBe(0);
+		expect(puts).toHaveLength(1);
+		expect(puts[0]?.expirationTtl).toBe(60);
+	});
+
 	test("first call: not cooling, sets the cooldown, returns 0", async () => {
 		const kv = new MemoryKV();
 		const remaining = await checkAndSetCooldown(kv, "ask:cooldown:u1", 300);
@@ -65,7 +83,8 @@ describe("checkAndSetCooldown", () => {
 
 	test("KV's own TTL eviction (key simply missing) is treated the same as a first call", async () => {
 		const kv = new MemoryKV();
-		// expirationTtl 0 is treated by the stub as "already gone" — the closest
+		// expirationTtl -1 produces a past expiresAt, simulating "already gone" —
+		// the closest
 		// in-memory stand-in for a key KV itself has already evicted.
 		await kv.put("ask:cooldown:u1", String(Date.now()), { expirationTtl: -1 });
 

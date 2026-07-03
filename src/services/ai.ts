@@ -39,7 +39,10 @@ NEVER invent Ainu words, forms, or translations that are not present in the sour
 Answer in the same language the user asked in.
 Keep the answer to 250 words or fewer.`;
 
+import { ApiError } from "../lib/errors.js";
+
 const MAX_OUTPUT_TOKENS = 800;
+const AI_TIMEOUT_MS = 60_000;
 
 export interface AskSource {
 	id: string;
@@ -91,11 +94,24 @@ export async function runAsk(
 		max_output_tokens: MAX_OUTPUT_TOKENS,
 	};
 
-	const result = env.AI_GATEWAY_ID
-		? await env.AI.run(env.ASK_MODEL, inputs, {
+	const run = env.AI_GATEWAY_ID
+		? env.AI.run(env.ASK_MODEL, inputs, {
 				gateway: { id: env.AI_GATEWAY_ID },
 			})
-		: await env.AI.run(env.ASK_MODEL, inputs);
+		: env.AI.run(env.ASK_MODEL, inputs);
+
+	// `AI.run` accepts no AbortSignal, so race it against a hard deadline: a
+	// stalled inference must fail fast into the normal error path instead of
+	// holding the deferred interaction open indefinitely.
+	const result = await Promise.race([
+		run,
+		new Promise<never>((_, reject) => {
+			setTimeout(
+				() => reject(new ApiError("timeout", "Workers AI call timed out")),
+				AI_TIMEOUT_MS,
+			);
+		}),
+	]);
 
 	return extractAnswerText(result);
 }

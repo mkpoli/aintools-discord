@@ -373,19 +373,26 @@ export async function askHandler(c: CommandContext<AppEnv>): Promise<Response> {
 	}
 
 	const userId = actorId(c.interaction) ?? "unknown";
+	// `"0"` is a deliberate operator choice (cooldown off) — only fall back to
+	// the default when the var is unset/garbage/negative.
+	const parsedCooldown = Number(c.env.ASK_COOLDOWN_SECONDS);
 	const cooldownSeconds =
-		Number(c.env.ASK_COOLDOWN_SECONDS) || DEFAULT_COOLDOWN_SECONDS;
-	const remaining = await checkAndSetCooldown(
-		c.env.KV,
-		`ask:cooldown:${userId}`,
-		cooldownSeconds,
-	);
-	if (remaining > 0) {
-		return c
-			.flags("EPHEMERAL")
-			.res(
-				`⏳ ${remaining}秒後にもう一度お試しください。 / Try again in ${remaining}s.`,
-			);
+		Number.isFinite(parsedCooldown) && parsedCooldown >= 0
+			? parsedCooldown
+			: DEFAULT_COOLDOWN_SECONDS;
+	if (cooldownSeconds > 0) {
+		const remaining = await checkAndSetCooldown(
+			c.env.KV,
+			`ask:cooldown:${userId}`,
+			cooldownSeconds,
+		);
+		if (remaining > 0) {
+			return c
+				.flags("EPHEMERAL")
+				.res(
+					`⏳ ${remaining}秒後にもう一度お試しください。 / Try again in ${remaining}s.`,
+				);
+		}
 	}
 
 	return c.resDefer(async (c) => {

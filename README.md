@@ -13,7 +13,7 @@ idiom already used across the aynu.org Worker fleet.
 
 ## Architecture
 
-```
+```text
 Discord ── HTTPS interactions ──> Worker "aintools-discord" (bot.aynu.org)
                                     ├─ ainconv (in-process)          /convert
                                     ├─ corpus.aynu.org (fetch/SB)    /corpus /lookup

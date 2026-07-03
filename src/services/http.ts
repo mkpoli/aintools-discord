@@ -44,7 +44,9 @@ async function fetchUpstream(
 	const url = baseUrl + path;
 	try {
 		return binding
-			? await binding.fetch(new Request(url))
+			? await binding.fetch(
+					new Request(url, { signal: AbortSignal.timeout(8000) }),
+				)
 			: await fetch(url, { signal: AbortSignal.timeout(8000) });
 	} catch (err) {
 		if (err instanceof Error && err.name === "TimeoutError") {

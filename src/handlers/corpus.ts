@@ -51,7 +51,7 @@ function sentencesEmbed(query: string, rows: CorpusRow[]): Embed {
 		.title(`Corpus search: ${truncate(query, 200)}`)
 		.fields(
 			...rows.map((row) => ({
-				name: truncate(`**${row.text}**`, FIELD_NAME_LIMIT),
+				name: `**${truncate(row.text, FIELD_NAME_LIMIT - 4)}**`,
 				value: truncate(
 					`${row.translation ?? "—"}\n-# ${[row.dialect, row.author, row.document].filter(Boolean).join(" · ") || "—"}`,
 					FIELD_VALUE_LIMIT,
