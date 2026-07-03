@@ -24,7 +24,7 @@
 		"MDB_API_URL": "https://mdb.aynu.org",
 		"GLOSSARY_API_URL": "https://itak.aynu.org/api/gdoc",
 		// Empty ⇒ WOTD cron no-ops safely (set once a post channel is chosen).
-		"WOTD_CHANNEL_ID": "",
+		"WOTD_CHANNEL_ID": "1522660516026257478",
 		// Empty ⇒ env.AI.run is called directly with no gateway hop (the gateway
 		// is optional observability, never a hard dependency). To enable request
 		// logging/caching for /ask, create an AI Gateway named "aintools-discord"
