@@ -1,14 +1,36 @@
 import { DiscordHono } from "discord-hono";
-import { commands } from "./commands.js";
-import { safeHandler } from "./lib/errors.js";
+import { runWotd } from "./cron/wotd.js";
+import { analyzeHandler } from "./handlers/analyze.js";
+import { askHandler } from "./handlers/ask.js";
+import { convert, convertScriptContextMenu } from "./handlers/convert.js";
+import { corpusHandler } from "./handlers/corpus.js";
+import { glossaryAutocomplete, glossaryHandler } from "./handlers/glossary.js";
+import { lookupHandler } from "./handlers/lookup.js";
+import { quiz, quizAnswer, quizNext } from "./handlers/quiz.js";
+import { type AppEnv, safeHandler } from "./lib/errors.js";
 
-const app = new DiscordHono<{ Bindings: Env }>();
+const app = new DiscordHono<AppEnv>();
 
-// Temporary smoke command — replaced by real feature commands PR-1 onward.
-const [ping] = commands;
-app.command(
-	ping.toJSON().name,
-	safeHandler((c) => c.res("Pong!")),
+app.command("convert", safeHandler(convert));
+app.command("Convert script", safeHandler(convertScriptContextMenu));
+app.command("corpus", safeHandler(corpusHandler));
+app.command("analyze", safeHandler(analyzeHandler));
+app.autocomplete(
+	"glossary",
+	glossaryAutocomplete,
+	safeHandler(glossaryHandler),
 );
+app.command("lookup", safeHandler(lookupHandler));
+app.command("quiz", safeHandler(quiz));
+// quizAnswer/quizNext are components (not commands) — already wrapped with
+// their own error handler in handlers/quiz.ts, since errors.ts's safeHandler
+// is typed for CommandContext only.
+app.component("quiz", quizAnswer);
+app.component("quiz-next", quizNext);
+app.command("ask", safeHandler(askHandler));
+
+// Empty string matches any cron trigger not otherwise registered — the only
+// one configured is wrangler.jsonc's "0 22 * * *" (word-of-the-day, 07:00 JST).
+app.cron("", runWotd);
 
 export default app;

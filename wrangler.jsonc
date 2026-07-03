@@ -8,14 +8,14 @@
 		"enabled": true
 	},
 
-	// Custom domain, flipped on at cutover (PR-9) once the old docker-compose bot
-	// is ready to retire. Until then the workers.dev URL is the staging endpoint.
-	// "routes": [
-	// 	{
-	// 		"pattern": "bot.aynu.org",
-	// 		"custom_domain": true
-	// 	}
-	// ], // enable at cutover (PR-9)
+	// Production interactions endpoint. The workers.dev URL stays usable as a
+	// staging endpoint for a second (dev) Discord application.
+	"routes": [
+		{
+			"pattern": "bot.aynu.org",
+			"custom_domain": true
+		}
+	],
 
 	// Non-secret config. Secrets (DISCORD_TOKEN, DISCORD_PUBLIC_KEY,
 	// DISCORD_APPLICATION_ID) are set via `wrangler secret put`.
@@ -25,11 +25,50 @@
 		"GLOSSARY_API_URL": "https://itak.aynu.org/api/gdoc",
 		// Empty ⇒ WOTD cron no-ops safely (set once a post channel is chosen).
 		"WOTD_CHANNEL_ID": "",
-		"AI_GATEWAY_ID": "aintools-discord",
+		// Empty ⇒ env.AI.run is called directly with no gateway hop (the gateway
+		// is optional observability, never a hard dependency). To enable request
+		// logging/caching for /ask, create an AI Gateway named "aintools-discord"
+		// in the dashboard and set this to its id.
+		"AI_GATEWAY_ID": "",
 		"ASK_MODEL": "@cf/openai/gpt-oss-120b",
 		"ASK_COOLDOWN_SECONDS": "300"
-	}
+	},
 
-	// kv_namespaces / d1_databases / ai / services / triggers land in their
-	// respective feature PRs (see rewrite plan PR sequence).
+	// Worker-to-Worker bindings — no public hop for corpus.aynu.org / mdb.aynu.org
+	// reads. services/http.ts falls back to a plain fetch against *_API_URL
+	// when a binding isn't present (e.g. `wrangler dev` without --remote).
+	"services": [
+		{ "binding": "CORPUS", "service": "ainu-corpora-api" },
+		{ "binding": "MDB", "service": "ainu-mdb" }
+	],
+
+	// Glossary stale-while-revalidate cache (key "glossary:v1"); reused by
+	// /ask cooldowns in a later PR.
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "19c3ae65776d40338bf281b5b577738c"
+		}
+	],
+
+	// Quiz scores + streaks (PR-6, migrations/0001_quiz.sql); WOTD post history
+	// (PR-7, migrations/0002_wotd.sql).
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "aintools-discord",
+			"database_id": "074720f5-9667-47cc-b213-4e530e9fb9ac"
+		}
+	],
+
+	// Workers AI — /ask grounded Q&A. Routed through AI Gateway only when
+	// AI_GATEWAY_ID (above) is set.
+	"ai": {
+		"binding": "AI"
+	},
+
+	// Word-of-the-day post, daily at 22:00 UTC = 07:00 JST. Handler: src/cron/wotd.ts.
+	"triggers": {
+		"crons": ["0 22 * * *"]
+	}
 }
