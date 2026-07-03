@@ -31,7 +31,10 @@
 		// in the dashboard and set this to its id.
 		"AI_GATEWAY_ID": "",
 		"ASK_MODEL": "@cf/openai/gpt-oss-120b",
-		"ASK_COOLDOWN_SECONDS": "300"
+		"ASK_COOLDOWN_SECONDS": "300",
+		// Guild the message archiver crawls (src/services/archive.ts). Empty ⇒
+		// the archive cron no-ops safely, same pattern as WOTD_CHANNEL_ID.
+		"ARCHIVE_GUILD_ID": "1181228576989794324"
 	},
 
 	// Worker-to-Worker bindings — no public hop for corpus.aynu.org / mdb.aynu.org
@@ -67,8 +70,11 @@
 		"binding": "AI"
 	},
 
-	// Word-of-the-day post, daily at 22:00 UTC = 07:00 JST. Handler: src/cron/wotd.ts.
+	// "0 22 * * *": word-of-the-day post, daily at 22:00 UTC = 07:00 JST
+	// (src/cron/wotd.ts). "*/10 * * * *": message archive crawler, every 10
+	// minutes (src/services/archive.ts). Both are dispatched by explicit key
+	// in src/index.ts — see the comment there about the old catch-all.
 	"triggers": {
-		"crons": ["0 22 * * *"]
+		"crons": ["0 22 * * *", "*/10 * * * *"]
 	}
 }

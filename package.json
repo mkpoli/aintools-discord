@@ -9,6 +9,7 @@
 		"register": "bun --env-file=.dev.vars scripts/register.ts",
 		"register:prod": "REGISTER_SCOPE=global bun --env-file=.env.prod scripts/register.ts",
 		"extract-course": "bun scripts/extract-course.ts",
+		"import-archive": "bun scripts/import-archive.ts",
 		"test": "bun test",
 		"check": "biome check --write .",
 		"typecheck": "wrangler types && tsc --noEmit",

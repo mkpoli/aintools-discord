@@ -17,3 +17,7 @@ WOTD_CHANNEL_ID=
 AI_GATEWAY_ID=
 ASK_MODEL=@cf/openai/gpt-oss-120b
 ASK_COOLDOWN_SECONDS=300
+# Guild the message archiver crawls (src/services/archive.ts). Empty ⇒ the
+# archive cron no-ops safely. Point this at your staging test guild, never
+# the production Ainu server, when running `wrangler dev` locally.
+ARCHIVE_GUILD_ID=
