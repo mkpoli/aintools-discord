@@ -1,0 +1,17 @@
+# Discord app credentials. Use a second, staging Discord application ("AinTools
+# Dev") + a private test guild here — never the production app. See README.
+DISCORD_APPLICATION_ID=
+DISCORD_PUBLIC_KEY=
+DISCORD_TOKEN=
+DISCORD_TEST_GUILD_ID=
+
+# Mirrors the `vars` block in wrangler.jsonc so `wrangler dev` matches prod
+# shape. Override a value here (e.g. point at a local API) for local-only
+# testing; leave as-is to match production.
+CORPUS_API_URL=https://corpus.aynu.org
+MDB_API_URL=https://mdb.aynu.org
+GLOSSARY_API_URL=https://itak.aynu.org/api/gdoc
+WOTD_CHANNEL_ID=
+AI_GATEWAY_ID=aintools-discord
+ASK_MODEL=@cf/openai/gpt-oss-120b
+ASK_COOLDOWN_SECONDS=300
