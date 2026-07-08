@@ -5,6 +5,7 @@ import { runWotd } from "../src/cron/wotd.js";
 import type { AppEnv } from "../src/lib/errors.js";
 
 const CORPUS_URL = "https://corpus.aynu.org";
+const MDB_URL = "https://mdb.aynu.org";
 const GLOSSARY_URL = "https://itak.aynu.org/api/gdoc";
 const CHANNEL_ID = "channel-123";
 const NOW = new Date("2026-07-03T10:00:00Z"); // 2026-07-03 JST
@@ -90,6 +91,7 @@ function makeEnv(db: FakeD1, kv: MemoryKV, channelId = CHANNEL_ID): Env {
 		DB: db,
 		KV: kv,
 		CORPUS_API_URL: CORPUS_URL,
+		MDB_API_URL: MDB_URL,
 		GLOSSARY_API_URL: GLOSSARY_URL,
 		WOTD_CHANNEL_ID: channelId,
 	} as unknown as Env;
@@ -140,10 +142,12 @@ const GLOSSARY_TABLE = [
 
 let discordPosts: unknown[] = [];
 let discordShouldFail = false;
+let mdbLexemeResults: unknown[] = [];
 const originalFetch = globalThis.fetch;
 
 function stubFetch() {
 	discordPosts = [];
+	mdbLexemeResults = [];
 	globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = String(input);
 		if (url.startsWith(`${CORPUS_URL}/v1/freq/list`)) {
@@ -167,6 +171,16 @@ function stubFetch() {
 							uri: null,
 						},
 					],
+				}),
+			);
+		}
+		if (url.startsWith(`${MDB_URL}/api/lexemes`)) {
+			return new Response(
+				JSON.stringify({
+					query: "utar",
+					total: mdbLexemeResults.length,
+					returned: mdbLexemeResults.length,
+					results: mdbLexemeResults,
 				}),
 			);
 		}
@@ -220,6 +234,62 @@ describe("runWotd", () => {
 		const row = [...db.rows.values()][0];
 		expect(row.posted).toBe(1);
 		expect(["kamuy", "utar", "sinep"]).toContain(row.token);
+	});
+
+	test("all-ambiguous MDB homographs: still posts with the glossary gloss (no wrong MDB sense)", async () => {
+		stubFetch();
+		// The deterministic probe for NOW reaches `utar`, the only glossary hit;
+		// make its MDB lexemes ambiguous. Rather than skipping the day, WOTD must
+		// fall back to the glossary gloss (人々), never an arbitrary MDB sense.
+		mdbLexemeResults = [
+			{
+				id: "utar.n",
+				lemma: "utar",
+				kana: "",
+				pos: "n",
+				gloss_en: [],
+				gloss_jp: ["人々"],
+				bound: false,
+				dialects: [],
+				variations: [],
+				recordings: 0,
+				morphemes: [],
+			},
+			{
+				id: "utar.vi",
+				lemma: "utar",
+				kana: "",
+				pos: "vi",
+				gloss_en: [],
+				gloss_jp: ["仮の別義"],
+				bound: false,
+				dialects: [],
+				variations: [],
+				recordings: 0,
+				morphemes: [],
+			},
+		];
+		const db = new FakeD1();
+		const { c, settle } = makeContext(makeEnv(db, new MemoryKV()));
+
+		await runWotd(c, NOW);
+		await settle();
+
+		// Post still happens, using the glossary gloss (not the ambiguous MDB one).
+		expect(discordPosts).toHaveLength(1);
+		const embed = (
+			discordPosts[0] as {
+				embeds: { fields: { name: string; value: string }[] }[];
+			}
+		).embeds[0];
+		const meaning = embed.fields.find((f) => f.name.includes("Meaning"))?.value;
+		expect(meaning).toContain("人々");
+		expect(meaning).not.toContain("仮の別義");
+
+		// History row is written so the day is not retried.
+		expect(db.rows.size).toBe(1);
+		expect([...db.rows.values()][0].posted).toBe(1);
+		expect([...db.rows.values()][0].token).toBe("utar");
 	});
 
 	test("rerun on the same JST day is a no-op (idempotent)", async () => {
