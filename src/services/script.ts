@@ -3,23 +3,26 @@
  *
  * Ports ainu-mcp/worker/src/tools/script.ts to the real ainconv@0.5.1 API,
  * which differs from that (older) reference: script names are PascalCase
- * ("Latn"/"Kana"/"Cyrl"/"Hang"), Hangul is natively supported, and
- * `detect()` returns "Mixed"/"Unknown" as first-class outcomes rather than
- * always resolving to one of the four real scripts.
+ * ("Latn"/"Kana"/"Cyrl"), and `detect()` returns "Mixed"/"Unknown" as
+ * first-class outcomes rather than always resolving to a real script.
+ *
+ * NOTE: ainconv also natively supports Hangul ("Hang"), but this bot
+ * intentionally does NOT expose Hangul transcription. We therefore narrow
+ * ainconv's `Script` down to the three supported scripts and treat any
+ * Hangul that `detect()` reports as unsupported ("no Ainu script detected").
  */
-import { convert, detect, type Script } from "ainconv";
+import { convert, detect } from "ainconv";
 
-export type ScriptName = Script; // "Latn" | "Kana" | "Cyrl" | "Hang"
+export type ScriptName = "Latn" | "Kana" | "Cyrl";
 export type Detected = ScriptName | "Mixed" | "Unknown";
 
-export const SCRIPTS: readonly ScriptName[] = ["Latn", "Kana", "Cyrl", "Hang"];
+export const SCRIPTS: readonly ScriptName[] = ["Latn", "Kana", "Cyrl"];
 
 /** Each script's own name, written in itself — shared by option choices and embeds. */
 export const SCRIPT_LABELS: Record<ScriptName, string> = {
 	Latn: "Latn",
 	Kana: "カタカナ Kana",
 	Cyrl: "Кириллица Cyrl",
-	Hang: "한글 Hang",
 };
 
 /** Thrown by `convertText`/`allScripts` when no script is detectable in the input. */
@@ -40,9 +43,10 @@ export class MixedScriptError extends Error {
 	}
 }
 
-// ainconv's own `detect()` never flags Hangul as part of a "Mixed" verdict —
-// e.g. detect("aynu이란") => "Hang", not "Mixed" — Latin is masked whenever
-// Hangul is present. Kana beats Cyrl beats Hang beats Latin in priority.
+// Hangul transcription is deliberately unsupported here. ainconv's `detect()`
+// can still return "Hang" for Hangul-only input (e.g. detect("이란") =>
+// "Hang"), so we fold that verdict into "Unknown": as far as this bot is
+// concerned, Hangul is not an Ainu script it works with.
 //
 // Exported (not just an internal helper) so callers — e.g. the /convert
 // handler — can pin down the source once, up front, and reuse it both for
@@ -50,14 +54,17 @@ export class MixedScriptError extends Error {
 // `detect()` a second time.
 export function resolveScript(text: string, from?: ScriptName): ScriptName {
 	const source = from ?? detect(text);
-	if (source === "Unknown") throw new UnknownScriptError(text);
+	if (source === "Unknown" || source === "Hang")
+		throw new UnknownScriptError(text);
 	if (source === "Mixed") throw new MixedScriptError(text);
 	return source;
 }
 
-/** Detect the script of `text`: one of the 4 scripts, "Mixed", or "Unknown". */
+/** Detect the script of `text`: one of the 3 scripts, "Mixed", or "Unknown". */
 export function detectScript(text: string): Detected {
-	return detect(text);
+	const source = detect(text);
+	// Hangul is unsupported: report it as "Unknown" rather than leaking "Hang".
+	return source === "Hang" ? "Unknown" : source;
 }
 
 /**
@@ -79,7 +86,7 @@ export type AllScripts = {
 };
 
 /**
- * Convert `text` into all 4 scripts at once, resolving the source via
+ * Convert `text` into all 3 supported scripts at once, resolving the source via
  * `detectScript` unless `from` overrides it.
  */
 export function allScripts(text: string, from?: ScriptName): AllScripts {

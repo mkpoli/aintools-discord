@@ -128,7 +128,7 @@ export function corpusSection(
 	};
 }
 
-/** 🔤 Scripts — the same word rendered in all four scripts, one per line. */
+/** 🔤 Scripts — the same word rendered in all three supported scripts, one per line. */
 export function scriptsSection(
 	settled: PromiseSettledResult<AllScripts>,
 ): Section {

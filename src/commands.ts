@@ -11,10 +11,10 @@ const scriptChoices = SCRIPTS.map((value) => ({
 export const commands = [
 	new Command(
 		"convert",
-		"Convert Ainu text between Latin, Katakana, Cyrillic, and Hangul.",
+		"Convert Ainu text between Latin, Katakana, and Cyrillic.",
 	).options(
 		new Option("text", "Text to convert").required(),
-		new Option("to", "Target script — omit to see all four at once").choices(
+		new Option("to", "Target script — omit to see all three at once").choices(
 			...scriptChoices,
 		),
 		new Option("from", "Source script — auto-detected if omitted").choices(

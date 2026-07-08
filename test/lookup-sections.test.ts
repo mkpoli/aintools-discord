@@ -162,7 +162,6 @@ describe("scriptsSection", () => {
 				Latn: "kamuy",
 				Kana: "カムイ",
 				Cyrl: "камуй",
-				Hang: "카무이",
 			},
 		};
 		const section = scriptsSection(fulfilled(result));
@@ -170,6 +169,5 @@ describe("scriptsSection", () => {
 		expect(section.render()).toContain("kamuy");
 		expect(section.render()).toContain("カムイ");
 		expect(section.render()).toContain("камуй");
-		expect(section.render()).toContain("카무이");
 	});
 });
