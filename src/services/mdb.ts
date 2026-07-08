@@ -104,6 +104,28 @@ export interface MdbFormsResult {
 	results: MdbFormRow[];
 }
 
+/** One row of `/api/lexemes` (`rowView()` in mdb's lexeme API). */
+export interface MdbLexemeSearchRow {
+	id: string;
+	lemma: string;
+	kana: string;
+	pos: string;
+	gloss_en: string[];
+	gloss_jp: string[];
+	bound: boolean;
+	dialects: string[];
+	variations: string[];
+	recordings: number;
+	morphemes: string[];
+}
+
+export interface MdbLexemeSearchResult {
+	query: string;
+	total: number;
+	returned: number;
+	results: MdbLexemeSearchRow[];
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
 	const u = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {
@@ -140,4 +162,18 @@ export async function forms(
 ): Promise<MdbFormsResult> {
 	const query = qs({ q, limit });
 	return getJson<MdbFormsResult>(env, "MDB", `/api/forms?${query}`);
+}
+
+/**
+ * `GET /api/lexemes` — search the canonical lexeme layer. WOTD uses this to
+ * prefer sense-split MDB meanings over glossary-only rows, so homographs like
+ * `nina` don't collapse into a place-name/fish/firewood mix.
+ */
+export async function searchLexemes(
+	env: Env,
+	q: string,
+	limit = 20,
+): Promise<MdbLexemeSearchResult> {
+	const query = qs({ q, limit });
+	return getJson<MdbLexemeSearchResult>(env, "MDB", `/api/lexemes?${query}`);
 }

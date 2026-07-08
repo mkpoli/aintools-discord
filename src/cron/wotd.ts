@@ -12,7 +12,7 @@
  *  2. no-ops if today (JST) already has a `posted=1` row in `wotd_history`
  *  3. sources candidates from `/v1/freq/list`, filters them, deterministically
  *     picks one by `fnv1a(date)`, probing forward for a glossary hit
- *  4. enriches with a glossary gloss, one corpus example, and all 4 scripts
+ *  4. enriches with a glossary gloss, one corpus example, and all 3 supported scripts
  *  5. posts an embed via the cron context's REST helper, then upserts the
  *     history row — only on a confirmed-successful post, so a failure never
  *     leaves a false "posted" row behind (the next day's run would still
@@ -30,6 +30,7 @@ import {
 	getGlossary,
 	searchGlossary,
 } from "../services/glossary.js";
+import { type MdbLexemeSearchRow, searchLexemes } from "../services/mdb.js";
 import { allScripts, SCRIPT_LABELS, SCRIPTS } from "../services/script.js";
 
 const CANDIDATE_LIMIT = 400;
@@ -38,6 +39,7 @@ const RECENT_WINDOW_DAYS = 180;
 const MAX_PROBE = 20;
 const EXAMPLE_LIMIT = 5;
 const GLOSSARY_LOOKUP_LIMIT = 5;
+const MDB_LEXEME_LOOKUP_LIMIT = 20;
 
 // ---------------------------------------------------------------- pure ----
 
@@ -157,6 +159,14 @@ function normalizeAynu(s: string): string {
 		.replace(/\p{M}/gu, "");
 }
 
+/** Folded token used for exact sense matching; removes accents, case, and glottal apostrophes. */
+function wotdKey(s: string): string {
+	return normalizeAynu(s)
+		.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰0-9]+$/u, "")
+		.replace(/['’]/g, "")
+		.replace(/\s+/g, "");
+}
+
 /** The glossary row whose `Aynu` field exactly matches `token` (accent/case-insensitive), if any. */
 export function glossaryExactEntry(
 	table: GlossaryTable,
@@ -166,6 +176,118 @@ export function glossaryExactEntry(
 	return searchGlossary(table, token, GLOSSARY_LOOKUP_LIMIT).find(
 		(entry) => entry.Aynu !== undefined && normalizeAynu(entry.Aynu) === target,
 	);
+}
+
+export interface WotdLexemeSelection {
+	lexeme: MdbLexemeSearchRow | undefined;
+	ambiguous: boolean;
+}
+
+interface WotdSelection {
+	token: string;
+	entry: GlossaryEntry | undefined;
+	example: CorpusRow | undefined;
+	lexeme: MdbLexemeSearchRow | undefined;
+}
+
+/** Exact canonical lexeme rows for a corpus token, preserving homograph splits. */
+export function exactLexemeRows(
+	rows: readonly MdbLexemeSearchRow[],
+	token: string,
+): MdbLexemeSearchRow[] {
+	const target = wotdKey(token);
+	return rows.filter((row) => {
+		const forms = [row.lemma, ...row.variations];
+		return forms.some((form) => wotdKey(form) === target);
+	});
+}
+
+function isProperNameLexeme(row: MdbLexemeSearchRow): boolean {
+	// `lemma[0] === lemma[0].toUpperCase()` was true for ANY caseless first
+	// char (apostrophe ’, digit, kana) — wrongly excluding those lemmas as
+	// proper names. Require an actual uppercase-letter initial instead.
+	return row.pos === "propn" || /^\p{Lu}/u.test(row.lemma);
+}
+
+function tokenAppearsInExample(
+	row: CorpusRow | undefined,
+	token: string,
+): boolean {
+	if (!row) return false;
+	const target = wotdKey(token);
+	return row.text
+		.split(/[^\p{L}'’]+/u)
+		.some((part) => wotdKey(part) === target);
+}
+
+// Match Han, Katakana and Hiragana runs *separately* (never merged), so a
+// single-Han term like 薪 stays isolated instead of being swallowed into a
+// mixed Han+hiragana run such as 薪を採る. Hiragana runs are included so
+// glosses like こねつぶす (the nina "mash/knead" sense) can context-match at
+// all — the old Han/Katakana-only regex silently killed that sense.
+const GLOSS_TERM_RUNS: readonly RegExp[] = [
+	/\p{Script=Han}+/gu,
+	/[\p{Script=Katakana}ー]+/gu,
+	/\p{Script=Hiragana}+/gu,
+];
+
+function lexemeMatchesExampleContext(
+	row: MdbLexemeSearchRow,
+	example: CorpusRow | undefined,
+): boolean {
+	const text = `${example?.text ?? ""}\n${example?.translation ?? ""}`;
+	if (!text.trim()) return false;
+	for (const gloss of [...row.gloss_jp, ...row.gloss_en]) {
+		for (const re of GLOSS_TERM_RUNS) {
+			for (const term of gloss.match(re) ?? []) {
+				// Accept a single Han character (corpus translations often say
+				// just 薪) or any run of length >= 2.
+				const isSingleHan = term.length === 1 && re.source.includes("Han");
+				if (!(isSingleHan || term.length >= 2)) continue;
+				if (text.includes(term)) return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Pick one MDB lexeme for the WOTD token. Ambiguous bare homographs are skipped
+ * unless the example/query context can safely choose a non-proper-name sense.
+ */
+export function selectWotdLexeme(
+	token: string,
+	rows: readonly MdbLexemeSearchRow[],
+	example: CorpusRow | undefined,
+): WotdLexemeSelection {
+	const exact = exactLexemeRows(rows, token).filter((row) => !row.bound);
+	if (exact.length === 0) return { lexeme: undefined, ambiguous: false };
+
+	// Corpus frequency tokens are lowercase common words in practice. Do not let
+	// a proper-name row (e.g. Nina 荷菜) satisfy a lowercase WOTD unless the token
+	// and example explicitly use that capitalized form.
+	const commonRows = exact.filter((row) => !isProperNameLexeme(row));
+	const properRows = exact.filter((row) => isProperNameLexeme(row));
+	if (commonRows.length === 0) {
+		const proper = properRows.find(
+			(row) => row.lemma === token && tokenAppearsInExample(example, row.lemma),
+		);
+		return proper
+			? { lexeme: proper, ambiguous: false }
+			: { lexeme: undefined, ambiguous: true };
+	}
+
+	const contextMatches = commonRows.filter((row) =>
+		lexemeMatchesExampleContext(row, example),
+	);
+	if (contextMatches.length === 1) {
+		return { lexeme: contextMatches[0], ambiguous: false };
+	}
+	if (commonRows.length === 1) {
+		return { lexeme: commonRows[0], ambiguous: false };
+	}
+
+	return { lexeme: undefined, ambiguous: true };
 }
 
 function scriptsFieldValue(token: string): string {
@@ -179,14 +301,27 @@ function exampleFieldValue(row: CorpusRow | undefined): string {
 }
 
 /** Pure embed builder — the only non-pure step left is `.toJSON()` at the call site (none here). */
+function lexemeMeaning(
+	lexeme: MdbLexemeSearchRow | undefined,
+): string | undefined {
+	if (!lexeme) return undefined;
+	return (
+		[lexeme.gloss_jp[0], lexeme.gloss_en[0]].filter(Boolean).join(" · ") ||
+		undefined
+	);
+}
+
 export function wotdEmbed(
 	token: string,
 	entry: GlossaryEntry | undefined,
 	example: CorpusRow | undefined,
+	lexeme?: MdbLexemeSearchRow,
 ) {
-	const meaning = entry
-		? [entry.日本語, entry.English].filter(Boolean).join(" · ") || "—"
-		: "（辞書未登録 / not yet in the glossary）";
+	const meaning =
+		lexemeMeaning(lexeme) ??
+		(entry
+			? [entry.日本語, entry.English].filter(Boolean).join(" · ") || "—"
+			: "（辞書未登録 / not yet in the glossary）");
 	return baseEmbed("corpus.aynu.org · itak.aynu.org")
 		.title(`📅 今日のアイヌ語 / Word of the day: ${token}`)
 		.fields(
@@ -279,28 +414,75 @@ export async function runWotd(
 
 		const table = await getGlossary(c.env, c.executionCtx);
 		const startIndex = pickIndex(today, candidates.length);
-		const { token } = probeForGlossaryHit(
-			candidates,
-			startIndex,
-			(t) => glossaryExactEntry(table, t) !== undefined,
-		);
-		const entry = glossaryExactEntry(table, token);
+		let selected: WotdSelection | undefined;
+		// First glossary-backed candidate whose MDB lexemes were ambiguous —
+		// used as a fallback (glossary gloss only) so an all-ambiguous day still
+		// posts instead of being silently skipped.
+		let ambiguousFallback: WotdSelection | undefined;
+		const probes = Math.min(MAX_PROBE, candidates.length);
+		for (let step = 0; step < probes; step++) {
+			const index = (startIndex + step) % candidates.length;
+			// biome-ignore lint/style/noNonNullAssertion: index is derived from candidates.length > 0.
+			const token = candidates[index]!;
+			const entry = glossaryExactEntry(table, token);
+			if (!entry) continue;
 
-		const exampleRows = await searchCorpus(c.env, {
-			q: token,
-			lang: "ain",
-			limit: EXAMPLE_LIMIT,
-		});
-		const example = shortestTranslatedExample(exampleRows);
+			const exampleRows = await searchCorpus(c.env, {
+				q: token,
+				lang: "ain",
+				limit: EXAMPLE_LIMIT,
+			});
+			const example = shortestTranslatedExample(exampleRows);
+			const lexemeRows = await searchLexemes(
+				c.env,
+				token,
+				MDB_LEXEME_LOOKUP_LIMIT,
+			);
+			const { lexeme, ambiguous } = selectWotdLexeme(
+				token,
+				lexemeRows.results,
+				example,
+			);
+			if (ambiguous) {
+				console.warn(
+					`[wotd] ${token} has ambiguous MDB lexemes — probing next`,
+				);
+				if (!ambiguousFallback) {
+					// Remember the first ambiguous candidate: glossary gloss only.
+					ambiguousFallback = { token, entry, example, lexeme: undefined };
+				}
+				continue;
+			}
+			selected = { token, entry, example, lexeme };
+			break;
+		}
+		if (!selected) {
+			if (ambiguousFallback) {
+				console.warn(
+					`[wotd] ${ambiguousFallback.token}: MDB enrichment skipped due to homograph ambiguity — posting glossary gloss only`,
+				);
+				selected = ambiguousFallback;
+			} else {
+				console.warn("[wotd] no glossary-backed candidate at all — skipping");
+				return;
+			}
+		}
 
 		const res = await c.rest("POST", $channels$_$messages, [channelId], {
-			embeds: [wotdEmbed(token, entry, example).toJSON()],
+			embeds: [
+				wotdEmbed(
+					selected.token,
+					selected.entry,
+					selected.example,
+					selected.lexeme,
+				).toJSON(),
+			],
 		});
 		if (!res.ok) {
 			throw new Error(`Discord post failed: HTTP ${res.status}`);
 		}
 
-		await upsertPosted(db, today, token);
+		await upsertPosted(db, today, selected.token);
 	} catch (err) {
 		console.error(
 			"[wotd] run failed — no history row written, will retry",

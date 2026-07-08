@@ -1,17 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import {
+	exactLexemeRows,
 	filterCandidates,
 	glossaryExactEntry,
 	isCandidateToken,
 	jstDateString,
 	pickIndex,
 	probeForGlossaryHit,
+	selectWotdLexeme,
 	shiftDateString,
 	shortestTranslatedExample,
 } from "../src/cron/wotd.js";
 import { fnv1a } from "../src/lib/hash.js";
 import type { CorpusRow } from "../src/services/corpus.js";
 import type { GlossaryEntry } from "../src/services/glossary.js";
+import type { MdbLexemeSearchRow } from "../src/services/mdb.js";
 
 describe("fnv1a — FNV-1a 32-bit", () => {
 	// Canonical FNV-1a-32 test vectors (http://www.isthe.com/chongo/src/fnv/test_fnv.c).
@@ -217,6 +220,148 @@ describe("glossaryExactEntry", () => {
 
 	test("returns undefined when there is no glossary entry at all", () => {
 		expect(glossaryExactEntry(table, "nonexistentword")).toBeUndefined();
+	});
+});
+
+describe("MDB lexeme selection for WOTD", () => {
+	const lexeme = (
+		partial: Partial<MdbLexemeSearchRow> &
+			Pick<MdbLexemeSearchRow, "id" | "lemma">,
+	): MdbLexemeSearchRow => ({
+		kana: "",
+		pos: "n",
+		gloss_en: [],
+		gloss_jp: [],
+		bound: false,
+		dialects: [],
+		variations: [],
+		recordings: 0,
+		morphemes: [],
+		...partial,
+	});
+
+	const example = (text: string, translation: string): CorpusRow => ({
+		id: "s1",
+		text,
+		translation,
+		dialect: "沙流",
+		author: null,
+		collection: null,
+		document: null,
+		uri: null,
+	});
+
+	test("exact lexeme rows treat accented/numbered nina variants as one token key", () => {
+		const rows = [
+			lexeme({ id: "nina.vi", lemma: "nina¹" }),
+			lexeme({ id: "nina.vt", lemma: "nina²" }),
+			lexeme({ id: "ninasamampe.n", lemma: "ninasamampe" }),
+		];
+		expect(exactLexemeRows(rows, "nína").map((r) => r.id)).toEqual([
+			"nina.vi",
+			"nina.vt",
+		]);
+	});
+
+	test("nina firewood example selects the firewood verb, not place/fish senses", () => {
+		const rows = [
+			lexeme({
+				id: "nina.vi",
+				lemma: "nina¹",
+				pos: "vi",
+				gloss_jp: ["薪を採る；日常生活においてはおもに女性の仕事である"],
+				gloss_en: ["gather firewood"],
+			}),
+			lexeme({
+				id: "nina.vt",
+				lemma: "nina²",
+				pos: "vt",
+				gloss_jp: ["～をこねつぶす"],
+			}),
+			lexeme({
+				id: "nina.n",
+				lemma: "nina",
+				pos: "n",
+				gloss_jp: ["ヒラメ"],
+			}),
+			lexeme({
+				id: "nina.propn",
+				lemma: "Nina",
+				pos: "propn",
+				gloss_jp: ["荷菜"],
+			}),
+		];
+		const selected = selectWotdLexeme(
+			"nina",
+			rows,
+			example("semas nina poka suke poka", "粗末な薪でも料理でも"),
+		);
+		expect(selected.ambiguous).toBe(false);
+		expect(selected.lexeme?.id).toBe("nina.vi");
+	});
+
+	test("nina mash-context example selects the mash verb (hiragana gloss こねつぶす)", () => {
+		const rows = [
+			lexeme({
+				id: "nina.vi",
+				lemma: "nina¹",
+				pos: "vi",
+				gloss_jp: ["薪を採る"],
+			}),
+			lexeme({
+				id: "nina.vt",
+				lemma: "nina²",
+				pos: "vt",
+				gloss_jp: ["～をこねつぶす"],
+			}),
+			lexeme({ id: "nina.n", lemma: "nina", pos: "n", gloss_jp: ["ヒラメ"] }),
+			lexeme({
+				id: "nina.propn",
+				lemma: "Nina",
+				pos: "propn",
+				gloss_jp: ["荷菜"],
+			}),
+		];
+		const selected = selectWotdLexeme(
+			"nina",
+			rows,
+			example("kem nina", "筋子をこねつぶす"),
+		);
+		expect(selected.ambiguous).toBe(false);
+		expect(selected.lexeme?.id).toBe("nina.vt");
+	});
+
+	test("lemma with a caseless first char (apostrophe) is NOT a proper name", () => {
+		// A lemma like ’itak / 'itak starts with a caseless apostrophe; the old
+		// toUpperCase() check wrongly treated it as a proper name and dropped it.
+		const rows = [
+			lexeme({
+				id: "itak.vi",
+				lemma: "’itak",
+				pos: "vi",
+				gloss_jp: ["話す"],
+			}),
+		];
+		const selected = selectWotdLexeme("’itak", rows, example("’itak", "話す"));
+		expect(selected.ambiguous).toBe(false);
+		expect(selected.lexeme?.id).toBe("itak.vi");
+	});
+
+	test("ambiguous bare homograph is skipped when context cannot choose a sense", () => {
+		const selected = selectWotdLexeme(
+			"nina",
+			[
+				lexeme({
+					id: "nina.vi",
+					lemma: "nina¹",
+					pos: "vi",
+					gloss_jp: ["薪を採る"],
+				}),
+				lexeme({ id: "nina.n", lemma: "nina", pos: "n", gloss_jp: ["ヒラメ"] }),
+			],
+			example("nina ne.", "それである。"),
+		);
+		expect(selected).toEqual({ lexeme: undefined, ambiguous: true });
 	});
 });
 
