@@ -106,7 +106,7 @@ describe("/convert (in-process, signed interactions)", () => {
 			data: { embeds?: { fields?: { name: string; value: string }[] }[] };
 		};
 		const fields = body.data.embeds?.[0]?.fields ?? [];
-		expect(fields).toHaveLength(4);
+		expect(fields).toHaveLength(3);
 		const detected = fields.find((f) => f.name.includes("detected"));
 		expect(detected?.name).toContain("Latn");
 		expect(fields.find((f) => f.name.startsWith("カタカナ"))?.value).toBe(
@@ -160,7 +160,7 @@ describe("/convert (in-process, signed interactions)", () => {
 			};
 		};
 		expect(body.data.flags).toBeGreaterThan(0); // always ephemeral
-		expect(body.data.embeds?.[0]?.fields).toHaveLength(4);
+		expect(body.data.embeds?.[0]?.fields).toHaveLength(3);
 	});
 
 	it("context menu on a message with no content -> ephemeral error", async () => {

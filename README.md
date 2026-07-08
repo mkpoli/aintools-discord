@@ -28,7 +28,7 @@ Discord ── HTTPS interactions ──> Worker "aintools-discord" (bot.aynu.or
 
 | Command | What it does |
 |---|---|
-| `/convert text [to] [from]` | Convert Ainu text between Latin, Katakana, Cyrillic, and Hangul (`ainconv`) |
+| `/convert text [to] [from]` | Convert Ainu text between Latin, Katakana, and Cyrillic (`ainconv`) |
 | `Convert script` (right-click a message → Apps) | Ephemeral all-scripts view of any message |
 | `/corpus query [lang] [mode] [dialect] [limit]` | Aligned AIN⇄JP corpus search or KWIC concordance |
 | `/glossary query [limit]` | Search the itak.aynu.org glossary (with autocomplete) |

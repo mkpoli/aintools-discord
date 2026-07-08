@@ -12,11 +12,10 @@ import {
 // against these inputs — they pin the contract, not an assumption.
 
 describe("detectScript", () => {
-	it("detects each of the four scripts", () => {
+	it("detects each of the three supported scripts", () => {
 		expect(detectScript("irankarapte")).toBe("Latn");
 		expect(detectScript("イランカラㇷ゚テ")).toBe("Kana");
 		expect(detectScript("иранкараптэ")).toBe("Cyrl");
-		expect(detectScript("이란가랍더")).toBe("Hang");
 	});
 
 	it("reports Unknown for text with no Ainu-script characters, including empty", () => {
@@ -29,10 +28,14 @@ describe("detectScript", () => {
 		expect(detectScript("aynuайну")).toBe("Mixed");
 	});
 
-	it("never reports Mixed for Hangul — Hangul masks a co-occurring Latin run", () => {
-		// ainconv's detect() excludes Hangul from the Mixed check entirely, so
-		// Latin+Hangul text resolves to plain "Hang", not "Mixed".
-		expect(detectScript("aynu이란")).toBe("Hang");
+	it("treats Hangul as unsupported — reports Unknown, never 'Hang'", () => {
+		// Hangul transcription is intentionally removed from this bot. ainconv's
+		// detect() would return "Hang", but detectScript() folds that into
+		// "Unknown" so no Hangul ever leaks through.
+		expect(detectScript("이란가랍더")).toBe("Unknown");
+		// Hangul also masks a co-occurring Latin run inside ainconv, so this is
+		// likewise reported as Unknown rather than Latn/Mixed.
+		expect(detectScript("aynu이란")).toBe("Unknown");
 	});
 });
 
@@ -43,10 +46,9 @@ describe("convertText — round-trips", () => {
 		expect(convertText(kana, "Kana", "Latn")).toBe("irankarapte");
 	});
 
-	it("converts the sentence 'aynu itak' to Kana, Cyrl, and Hang", () => {
+	it("converts the sentence 'aynu itak' to Kana and Cyrl", () => {
 		expect(convertText("aynu itak", "Latn", "Kana")).toBe("アイヌ イタㇰ");
 		expect(convertText("aynu itak", "Latn", "Cyrl")).toBe("айну итак");
-		expect(convertText("aynu itak", "Latn", "Hang")).toBe("애누 이닥");
 	});
 
 	it("Kana round-trip of 'aynu itak' is lossy (documents ainconv's own ambiguity, not a bug)", () => {
@@ -56,14 +58,10 @@ describe("convertText — round-trips", () => {
 		expect(convertText(kana, "Kana", "Latn")).toBe("ainu itak");
 	});
 
-	it("round-trips 'irankarapte' through Cyrl and through Hang", () => {
+	it("round-trips 'irankarapte' through Cyrl", () => {
 		const cyrl = convertText("irankarapte", "Latn", "Cyrl");
 		expect(cyrl).toBe("иранкараптэ");
 		expect(convertText(cyrl, "Cyrl", "Latn")).toBe("irankarapte");
-
-		const hang = convertText("irankarapte", "Latn", "Hang");
-		expect(hang).toBe("이란가랍더");
-		expect(convertText(hang, "Hang", "Latn")).toBe("irankarapte");
 	});
 
 	it("auto-detects `from` when omitted", () => {
@@ -101,13 +99,12 @@ describe("convertText — error paths (must throw, never swallow)", () => {
 });
 
 describe("allScripts", () => {
-	it("returns all 4 scripts with the detected source marked, source unchanged", () => {
+	it("returns all 3 supported scripts with the detected source marked, source unchanged", () => {
 		const { source, scripts } = allScripts("irankarapte");
 		expect(source).toBe("Latn");
 		expect(scripts.Latn).toBe("irankarapte");
 		expect(scripts.Kana).toBe("イランカラㇷ゚テ");
 		expect(scripts.Cyrl).toBe("иранкараптэ");
-		expect(scripts.Hang).toBe("이란가랍더");
 		expect(Object.keys(scripts).sort()).toEqual([...SCRIPTS].sort());
 	});
 
