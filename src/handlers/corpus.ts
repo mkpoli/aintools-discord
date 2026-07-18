@@ -1,4 +1,5 @@
-import type { CommandContext, Embed } from "discord-hono";
+import type { AutocompleteContext, CommandContext, Embed } from "discord-hono";
+import { Autocomplete } from "discord-hono";
 import { baseEmbed } from "../lib/embeds.js";
 import type { AppEnv } from "../lib/errors.js";
 import { userMessage } from "../lib/errors.js";
@@ -6,8 +7,10 @@ import { truncate } from "../lib/truncate.js";
 import {
 	type CorpusLang,
 	type CorpusRow,
+	type DialectChoice,
 	type KwicLine,
 	kwic,
+	listDialects,
 	searchCorpus,
 } from "../services/corpus.js";
 
@@ -116,4 +119,60 @@ export function corpusHandler(c: CommandContext<AppEnv>): Response {
 			await c.followup(`⚠️ ${userMessage(err)}`);
 		}
 	});
+}
+
+const AUTOCOMPLETE_BUDGET_MS = 2000;
+const AUTOCOMPLETE_CHOICE_COUNT = 25;
+
+function autocompleteTimeout(ms: number): Promise<never> {
+	return new Promise((_, reject) => {
+		setTimeout(() => reject(new Error("autocomplete budget exceeded")), ms);
+	});
+}
+
+/** Pure filter — case-insensitive substring over dialect names, count order kept. */
+export function filterDialectChoices(
+	choices: readonly DialectChoice[],
+	query: string,
+	limit: number = AUTOCOMPLETE_CHOICE_COUNT,
+): DialectChoice[] {
+	const q = query.trim().toLowerCase();
+	return choices
+		.filter((c) => q === "" || c.name.toLowerCase().includes(q))
+		.slice(0, limit);
+}
+
+/**
+ * Autocomplete for the `dialect` option. Hard 2s budget and empty-list-on-
+ * any-failure — autocomplete must never error back to Discord.
+ */
+export async function corpusDialectAutocomplete(
+	c: AutocompleteContext<AppEnv>,
+) {
+	try {
+		if (c.focused?.name !== "dialect") {
+			return c.resAutocomplete(new Autocomplete("").choices());
+		}
+		const choices = await Promise.race([
+			listDialects(c.env),
+			autocompleteTimeout(AUTOCOMPLETE_BUDGET_MS),
+		]);
+		const matches = filterDialectChoices(
+			choices,
+			String(c.focused?.value ?? ""),
+		);
+		return c.resAutocomplete(
+			new Autocomplete("").choices(
+				...matches.map((d) => ({
+					name: `${d.name}（${d.count.toLocaleString("en-US")}文）`.slice(
+						0,
+						100,
+					),
+					value: d.name.slice(0, 100),
+				})),
+			),
+		);
+	} catch {
+		return c.resAutocomplete(new Autocomplete("").choices());
+	}
 }

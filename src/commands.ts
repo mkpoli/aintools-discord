@@ -38,7 +38,11 @@ export const commands = [
 			{ name: "sentences", value: "sentences" },
 			{ name: "kwic", value: "kwic" },
 		),
-		new Option("dialect", "Filter by dialect (substring match)", "String"),
+		new Option(
+			"dialect",
+			"Filter by dialect (substring match)",
+			"String",
+		).autocomplete(),
 		new Option("limit", "Max results, 1-10 (default: 5)", "Integer")
 			.min_value(1)
 			.max_value(10),
