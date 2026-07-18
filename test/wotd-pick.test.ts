@@ -7,9 +7,9 @@ import {
 	jstDateString,
 	pickIndex,
 	probeForGlossaryHit,
+	selectExamples,
 	selectWotdLexeme,
 	shiftDateString,
-	shortestTranslatedExample,
 } from "../src/cron/wotd.js";
 import { fnv1a } from "../src/lib/hash.js";
 import type { CorpusRow } from "../src/services/corpus.js";
@@ -291,11 +291,9 @@ describe("MDB lexeme selection for WOTD", () => {
 				gloss_jp: ["荷菜"],
 			}),
 		];
-		const selected = selectWotdLexeme(
-			"nina",
-			rows,
+		const selected = selectWotdLexeme("nina", rows, [
 			example("semas nina poka suke poka", "粗末な薪でも料理でも"),
-		);
+		]);
 		expect(selected.ambiguous).toBe(false);
 		expect(selected.lexeme?.id).toBe("nina.vi");
 	});
@@ -322,11 +320,9 @@ describe("MDB lexeme selection for WOTD", () => {
 				gloss_jp: ["荷菜"],
 			}),
 		];
-		const selected = selectWotdLexeme(
-			"nina",
-			rows,
+		const selected = selectWotdLexeme("nina", rows, [
 			example("kem nina", "筋子をこねつぶす"),
-		);
+		]);
 		expect(selected.ambiguous).toBe(false);
 		expect(selected.lexeme?.id).toBe("nina.vt");
 	});
@@ -342,7 +338,9 @@ describe("MDB lexeme selection for WOTD", () => {
 				gloss_jp: ["話す"],
 			}),
 		];
-		const selected = selectWotdLexeme("’itak", rows, example("’itak", "話す"));
+		const selected = selectWotdLexeme("’itak", rows, [
+			example("’itak", "話す"),
+		]);
 		expect(selected.ambiguous).toBe(false);
 		expect(selected.lexeme?.id).toBe("itak.vi");
 	});
@@ -359,18 +357,18 @@ describe("MDB lexeme selection for WOTD", () => {
 				}),
 				lexeme({ id: "nina.n", lemma: "nina", pos: "n", gloss_jp: ["ヒラメ"] }),
 			],
-			example("nina ne.", "それである。"),
+			[example("nina ne.", "それである。")],
 		);
 		expect(selected).toEqual({ lexeme: undefined, ambiguous: true });
 	});
 });
 
-describe("shortestTranslatedExample", () => {
+describe("selectExamples", () => {
 	const row = (
 		partial: Partial<CorpusRow> & Pick<CorpusRow, "text">,
 	): CorpusRow => ({
 		id: "id",
-		translation: null,
+		translation: "訳",
 		dialect: null,
 		author: null,
 		collection: null,
@@ -379,30 +377,74 @@ describe("shortestTranslatedExample", () => {
 		...partial,
 	});
 
-	test("picks the shortest row that has a translation", () => {
+	test("keeps only rows containing the token as a whole word", () => {
 		const rows = [
-			row({ text: "a long ainu sentence here", translation: "long" }),
-			row({ text: "short", translation: "s" }),
-			row({ text: "medium length", translation: "m" }),
+			row({ text: "Yeepeta'usnaypo." }),
+			row({ text: "pet or ta san" }),
+			row({ text: "petpo ka ta" }),
 		];
-		expect(shortestTranslatedExample(rows)?.text).toBe("short");
+		expect(selectExamples(rows, "pet").map((r) => r.text)).toEqual([
+			"pet or ta san",
+		]);
+	});
+
+	test("matches the token accent- and apostrophe-insensitively", () => {
+		const rows = [row({ text: "hoski 'oman nanna" })];
+		expect(selectExamples(rows, "hoski")).toHaveLength(1);
+		expect(selectExamples([row({ text: "sínep ne" })], "sinep")).toHaveLength(
+			1,
+		);
 	});
 
 	test("ignores rows with a null or blank translation", () => {
 		const rows = [
-			row({ text: "aa", translation: null }),
-			row({ text: "bbbb", translation: "  " }),
-			row({ text: "cccccc", translation: "has one" }),
+			row({ text: "pet aa", translation: null }),
+			row({ text: "pet bbbb", translation: "  " }),
+			row({ text: "pet cccccc" }),
 		];
-		expect(shortestTranslatedExample(rows)?.text).toBe("cccccc");
+		expect(selectExamples(rows, "pet").map((r) => r.text)).toEqual([
+			"pet cccccc",
+		]);
 	});
 
-	test("returns undefined when no row has a translation", () => {
-		const rows = [row({ text: "aa" }), row({ text: "b" })];
-		expect(shortestTranslatedExample(rows)).toBeUndefined();
+	test("prefers shorter sentences, up to the maximum", () => {
+		const rows = [
+			row({ text: "pet aaaa aaaa aaaa", dialect: "a" }),
+			row({ text: "pet bb", dialect: "b" }),
+			row({ text: "pet cccc cccc", dialect: "c" }),
+			row({ text: "pet d", dialect: "d" }),
+		];
+		expect(selectExamples(rows, "pet", 3).map((r) => r.text)).toEqual([
+			"pet d",
+			"pet bb",
+			"pet cccc cccc",
+		]);
 	});
 
-	test("returns undefined for an empty list", () => {
-		expect(shortestTranslatedExample([])).toBeUndefined();
+	test("spreads picks across distinct dialect+document sources first", () => {
+		const rows = [
+			row({ text: "pet a", dialect: "小田洲", document: "人食いババ" }),
+			row({ text: "pet bb", dialect: "小田洲", document: "人食いババ" }),
+			row({ text: "pet cccc", dialect: "沙流", document: "uwepeker 8" }),
+			row({ text: "pet dddddd", dialect: "千歳", document: "kamuy yukar" }),
+		];
+		expect(selectExamples(rows, "pet", 3).map((r) => r.dialect)).toEqual([
+			"小田洲",
+			"沙流",
+			"千歳",
+		]);
+	});
+
+	test("falls back to repeated sources when distinct ones run out", () => {
+		const rows = [
+			row({ text: "pet a", dialect: "小田洲", document: "x" }),
+			row({ text: "pet bb", dialect: "小田洲", document: "x" }),
+		];
+		expect(selectExamples(rows, "pet", 3)).toHaveLength(2);
+	});
+
+	test("returns [] when nothing usable matches", () => {
+		expect(selectExamples([], "pet")).toEqual([]);
+		expect(selectExamples([row({ text: "petpo" })], "pet")).toEqual([]);
 	});
 });
