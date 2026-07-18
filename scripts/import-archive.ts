@@ -33,7 +33,7 @@ import { join } from "node:path";
 const DEFAULT_JSONL_PATH =
 	"/home/mkpoli/projects/Ainu/ainu-discord-archive/messages.jsonl";
 const DEFAULT_GUILD_ID = "1181228576989794324";
-const D1_DATABASE_NAME = "aintools-discord";
+const D1_DATABASE_NAME = "ainu-discord-bot";
 const ROWS_PER_STATEMENT = 200;
 
 // --- exporter line → row (pure; unit-tested in test/import-archive.test.ts) --
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
 	console.log(`[import-archive] mapped ${rows.length} rows from ${jsonlPath}`);
 
 	const statements = buildInsertStatements(rows);
-	const dir = await mkdtemp(join(tmpdir(), "aintools-import-archive-"));
+	const dir = await mkdtemp(join(tmpdir(), "ainu-discord-bot-import-"));
 	const sqlPath = join(dir, "import.sql");
 	await writeFile(sqlPath, statements.join("\n\n"));
 	console.log(

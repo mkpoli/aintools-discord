@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "aintools-discord",
+	"name": "ainu-discord-bot",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-07-01",
 	"compatibility_flags": ["nodejs_compat"],
@@ -27,7 +27,7 @@
 		"WOTD_CHANNEL_ID": "1522660516026257478",
 		// Empty ⇒ env.AI.run is called directly with no gateway hop (the gateway
 		// is optional observability, never a hard dependency). To enable request
-		// logging/caching for /ask, create an AI Gateway named "aintools-discord"
+		// logging/caching for /ask, create an AI Gateway named "ainu-discord-bot"
 		// in the dashboard and set this to its id.
 		"AI_GATEWAY_ID": "",
 		"ASK_MODEL": "@cf/openai/gpt-oss-120b",
@@ -59,8 +59,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "aintools-discord",
-			"database_id": "074720f5-9667-47cc-b213-4e530e9fb9ac"
+			"database_name": "ainu-discord-bot",
+			"database_id": "ae4cc4f3-9b8a-4205-b9a8-e30adaf9d942"
 		}
 	],
 

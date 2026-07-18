@@ -211,7 +211,7 @@ describe("messageToRow", () => {
 			{
 				id: "m3",
 				timestamp: "2026-07-03T10:00:00.000Z",
-				author: { id: "b1", username: "aintools-discord", bot: true },
+				author: { id: "b1", username: "ainu-discord-bot", bot: true },
 			},
 			"c1",
 			"g1",

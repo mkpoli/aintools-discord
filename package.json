@@ -1,5 +1,5 @@
 {
-	"name": "aintools-discord",
+	"name": "ainu-discord-bot",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -13,8 +13,8 @@
 		"test": "bun test",
 		"check": "biome check --write .",
 		"typecheck": "wrangler types && tsc --noEmit",
-		"migrate:local": "wrangler d1 migrations apply aintools-discord --local",
-		"migrate:remote": "wrangler d1 migrations apply aintools-discord --remote"
+		"migrate:local": "wrangler d1 migrations apply ainu-discord-bot --local",
+		"migrate:remote": "wrangler d1 migrations apply ainu-discord-bot --remote"
 	},
 	"dependencies": {
 		"ainconv": "^0.5.1",

@@ -92,12 +92,12 @@ describe("runAsk", () => {
 
 	test("includes { gateway: { id } } as the third argument when AI_GATEWAY_ID is set", async () => {
 		const run = mockRun();
-		const env = makeEnv(run, "aintools-discord");
+		const env = makeEnv(run, "ainu-discord-bot");
 
 		await runAsk(env, "question", []);
 
 		expect(run).toHaveBeenCalledTimes(1);
 		const [, , options] = run.mock.calls[0];
-		expect(options).toEqual({ gateway: { id: "aintools-discord" } });
+		expect(options).toEqual({ gateway: { id: "ainu-discord-bot" } });
 	});
 });

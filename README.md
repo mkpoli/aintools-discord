@@ -1,4 +1,4 @@
-# aintools-discord
+# ainu-discord-bot
 
 A Discord bot that surfaces the [aynu.org](https://aynu.org) Ainu-language NLP
 stack — script conversion, corpus search, the glossary, morpheme analysis, a
@@ -14,7 +14,7 @@ idiom already used across the aynu.org Worker fleet.
 ## Architecture
 
 ```text
-Discord ── HTTPS interactions ──> Worker "aintools-discord" (bot.aynu.org)
+Discord ── HTTPS interactions ──> Worker "ainu-discord-bot" (bot.aynu.org)
                                     ├─ ainconv (in-process)          /convert
                                     ├─ corpus.aynu.org (fetch/SB)    /corpus /lookup
                                     ├─ mdb.aynu.org (fetch/SB)       /analyze /lookup
@@ -157,7 +157,7 @@ steps, in order — items marked **owner** are performed only by the owner:
    `DISCORD_PUBLIC_KEY` / `DISCORD_APPLICATION_ID` (values from the
    production application `1301574269704081568`).
 3. `bun run deploy` — creates the `bot.aynu.org` custom domain on first
-   deploy; then `wrangler d1 migrations apply aintools-discord --remote`.
+   deploy; then `wrangler d1 migrations apply ainu-discord-bot --remote`.
 4. Create `.env.prod` (production app id + token) and `bun run register:prod`
    to register the commands globally. Clean the leftover guild-scoped
    commands from the old bot:
