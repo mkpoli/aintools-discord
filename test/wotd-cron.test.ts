@@ -338,7 +338,10 @@ describe("runWotd", () => {
 		await runWotd(c, NOW);
 		await settle();
 
-		expect(discordPosts).toHaveLength(1); // attempted
-		expect(db.rows.size).toBe(0); // but never recorded as posted
+		// The embed attempt plus the best-effort failure notice.
+		expect(discordPosts).toHaveLength(2);
+		const notice = discordPosts[1] as { content?: string };
+		expect(notice.content).toContain("⚠️");
+		expect(db.rows.size).toBe(0); // never recorded as posted
 	});
 });
