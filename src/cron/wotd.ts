@@ -24,6 +24,7 @@ import { $channels$_$messages } from "discord-hono";
 import { baseEmbed } from "../lib/embeds.js";
 import type { AppEnv } from "../lib/errors.js";
 import { fnv1a } from "../lib/hash.js";
+import { truncate } from "../lib/truncate.js";
 import { type CorpusRow, freqList, searchCorpus } from "../services/corpus.js";
 import {
 	type GlossaryEntry,
@@ -142,14 +143,13 @@ export function probeForGlossaryHit(
 
 /**
  * A row's source identity for diversity: dialect + document, falling back to
- * collection. Rows with no source metadata at all are each their own source,
- * so a corpus of unattributed rows still yields multiple examples.
+ * collection. The separator stays in the key so a dialect-only "X" and a
+ * document-only "X" remain distinct sources; rows with no metadata at all
+ * share one key (capped at one diversity slot — the fallback pass in
+ * selectExamples still fills remaining slots from them).
  */
 function exampleSourceKey(row: CorpusRow): string {
-	const key = [row.dialect ?? "", row.document ?? row.collection ?? ""]
-		.join("\t")
-		.trim();
-	return key === "" ? `id:${row.id}` : key;
+	return [row.dialect ?? "", row.document ?? row.collection ?? ""].join("\t");
 }
 
 /**
@@ -165,31 +165,31 @@ export function selectExamples(
 	token: string,
 	max: number = EXAMPLE_MAX,
 ): CorpusRow[] {
-	const seenTexts = new Set<string>();
 	const usable = rows
 		.filter((row) => row.translation != null && row.translation.trim() !== "")
 		.filter((row) => tokenAppearsInExample(row, token))
-		.filter((row) => {
-			// The same formulaic sentence (refrains, proverbs) can appear in several
-			// documents — never show it twice in one post.
-			const folded = normalizeAynu(row.text);
-			if (seenTexts.has(folded)) return false;
-			seenTexts.add(folded);
-			return true;
-		})
 		.sort((a, b) => a.text.length - b.text.length);
 	const picked: CorpusRow[] = [];
 	const seenSources = new Set<string>();
+	// Text-level dedup happens inside the pick loops (never before them): the
+	// same formulaic sentence can appear in several documents, and the copy
+	// from a not-yet-represented source is the one worth keeping.
+	const seenTexts = new Set<string>();
 	for (const row of usable) {
 		if (picked.length >= max) break;
 		const key = exampleSourceKey(row);
-		if (seenSources.has(key)) continue;
+		const folded = normalizeAynu(row.text);
+		if (seenSources.has(key) || seenTexts.has(folded)) continue;
 		seenSources.add(key);
+		seenTexts.add(folded);
 		picked.push(row);
 	}
 	for (const row of usable) {
 		if (picked.length >= max) break;
-		if (!picked.includes(row)) picked.push(row);
+		const folded = normalizeAynu(row.text);
+		if (seenTexts.has(folded)) continue;
+		seenTexts.add(folded);
+		picked.push(row);
 	}
 	return picked;
 }
@@ -292,10 +292,15 @@ function lexemeMatchesExampleContext(
 	for (const gloss of [...row.gloss_jp, ...row.gloss_en]) {
 		for (const re of GLOSS_TERM_RUNS) {
 			for (const term of gloss.match(re) ?? []) {
-				// Accept a single Han character (corpus translations often say
-				// just 薪) or any run of length >= 2.
-				const isSingleHan = term.length === 1 && re.source.includes("Han");
-				if (!(isSingleHan || term.length >= 2)) continue;
+				// A single Han character carries meaning (corpus translations often
+				// say just 薪); hiragana needs >= 3 chars — 2-char runs like する
+				// or して are grammatical filler matching almost any translation.
+				const min = re.source.includes("Han")
+					? 1
+					: re.source.includes("Hiragana")
+						? 3
+						: 2;
+				if (term.length < min) continue;
 				if (text.includes(term)) return true;
 			}
 		}
@@ -331,19 +336,25 @@ export function selectWotdLexeme(
 			: { lexeme: undefined, ambiguous: true };
 	}
 
-	// Disambiguate against the primary (shortest) example first: pooling all
-	// examples lets two senses each match a different sentence, which reads as
-	// ambiguity even though the primary example decides cleanly.
-	let contextMatches = commonRows.filter((row) =>
-		lexemeMatchesExampleContext(row, examples.slice(0, 1)),
+	// Pool all examples first — a sense picked here must be attested somewhere
+	// in the slate, so a coincidental hit in one sentence can't decide alone.
+	// When several senses match the pool (each via a different sentence), the
+	// primary (shortest, shown first) example breaks the tie; if it can't,
+	// the homograph really is ambiguous.
+	const pooled = commonRows.filter((row) =>
+		lexemeMatchesExampleContext(row, examples),
 	);
-	if (contextMatches.length !== 1) {
-		contextMatches = commonRows.filter((row) =>
-			lexemeMatchesExampleContext(row, examples),
-		);
+	if (pooled.length === 1) {
+		return { lexeme: pooled[0], ambiguous: false };
 	}
-	if (contextMatches.length === 1) {
-		return { lexeme: contextMatches[0], ambiguous: false };
+	if (pooled.length > 1) {
+		const byPrimary = pooled.filter((row) =>
+			lexemeMatchesExampleContext(row, examples.slice(0, 1)),
+		);
+		if (byPrimary.length === 1) {
+			return { lexeme: byPrimary[0], ambiguous: false };
+		}
+		return { lexeme: undefined, ambiguous: true };
 	}
 	if (commonRows.length === 1) {
 		return { lexeme: commonRows[0], ambiguous: false };
@@ -364,8 +375,10 @@ export function filterExamplesBySense(
 	token: string,
 ): CorpusRow[] {
 	if (!lexeme) return [...examples];
+	// Mirror selectWotdLexeme's candidate rules: proper-name homographs are
+	// excluded there, so they must not act as rivals here either.
 	const rivals = exactLexemeRows(rows, token).filter(
-		(row) => !row.bound && row.id !== lexeme.id,
+		(row) => !row.bound && row.id !== lexeme.id && !isProperNameLexeme(row),
 	);
 	if (rivals.length === 0) return [...examples];
 	// When every example belongs to a rival sense, an empty result is correct —
@@ -406,10 +419,7 @@ export function exampleFieldValue(rows: readonly CorpusRow[]): string {
 	if (parts.length > 0) return parts.join("\n\n");
 	// Every example alone exceeds the limit — truncate the first.
 	// biome-ignore lint/style/noNonNullAssertion: rows.length > 0 is checked above.
-	const sliced = formatExample(rows[0]!).slice(0, EXAMPLE_FIELD_MAX - 1);
-	// Never end on a lone high surrogate (astral char cut in half).
-	const safe = /[\uD800-\uDBFF]$/.test(sliced) ? sliced.slice(0, -1) : sliced;
-	return `${safe}…`;
+	return truncate(formatExample(rows[0]!), EXAMPLE_FIELD_MAX);
 }
 
 /** Pure embed builder — the only non-pure step left is `.toJSON()` at the call site (none here). */

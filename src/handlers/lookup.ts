@@ -2,6 +2,7 @@ import type { CommandContext, Embed } from "discord-hono";
 import { baseEmbed } from "../lib/embeds.js";
 import type { AppEnv } from "../lib/errors.js";
 import { userMessage } from "../lib/errors.js";
+import { truncate } from "../lib/truncate.js";
 import { type CorpusRow, searchCorpus } from "../services/corpus.js";
 import {
 	type GlossaryEntry,
@@ -24,10 +25,6 @@ const CORPUS_LIMIT = 3;
 
 const UNAVAILABLE = "(unavailable)";
 const NONE = "(none)";
-
-function truncate(text: string, limit: number): string {
-	return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
-}
 
 /**
  * One embed field, plus whether it actually has content — used both to

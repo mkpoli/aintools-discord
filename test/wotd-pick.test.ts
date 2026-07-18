@@ -613,3 +613,132 @@ describe("filterExamplesBySense", () => {
 		).toEqual(examples);
 	});
 });
+
+describe("review follow-up regressions", () => {
+	const row = (
+		partial: Partial<CorpusRow> & Pick<CorpusRow, "text">,
+	): CorpusRow => ({
+		id: partial.text,
+		translation: "訳",
+		dialect: null,
+		author: null,
+		collection: null,
+		document: null,
+		uri: null,
+		...partial,
+	});
+
+	const lex = (
+		partial: Partial<MdbLexemeSearchRow> &
+			Pick<MdbLexemeSearchRow, "id" | "lemma">,
+	): MdbLexemeSearchRow => ({
+		kana: "",
+		pos: "n",
+		gloss_en: [],
+		gloss_jp: [],
+		bound: false,
+		dialects: [],
+		variations: [],
+		recordings: 0,
+		morphemes: [],
+		...partial,
+	});
+
+	test("a duplicated sentence keeps the copy from a not-yet-represented source", () => {
+		const rows = [
+			row({ text: "pet aa", document: "A" }),
+			row({ text: "pet bbb", document: "A" }),
+			row({ text: "pet bbb", document: "B", id: "b-copy" }),
+		];
+		const picked = selectExamples(rows, "pet", 2);
+		expect(picked.map((r) => r.document)).toEqual(["A", "B"]);
+	});
+
+	test("dialect-only and document-only sources with the same name stay distinct", () => {
+		const rows = [
+			row({ text: "pet aa", dialect: "幌別" }),
+			row({ text: "pet bbb", document: "幌別" }),
+		];
+		expect(selectExamples(rows, "pet", 2)).toHaveLength(2);
+	});
+
+	test("metadata-less rows share one diversity slot but still fill via fallback", () => {
+		const rows = [
+			row({ text: "pet aa", id: "1" }),
+			row({ text: "pet bbb", id: "2" }),
+			row({ text: "pet cccc", id: "3" }),
+		];
+		expect(selectExamples(rows, "pet", 3)).toHaveLength(3);
+	});
+
+	test("pool-then-primary: two senses matched by different examples resolve via the primary", () => {
+		const fire = lex({
+			id: "nina.vi",
+			lemma: "nina¹",
+			pos: "vi",
+			gloss_jp: ["薪を採る"],
+		});
+		const mash = lex({
+			id: "nina.vt",
+			lemma: "nina²",
+			pos: "vt",
+			gloss_jp: ["～をこねつぶす"],
+		});
+		const examples = [
+			row({ text: "kem nina", translation: "筋子をこねつぶす" }),
+			row({ text: "semas nina poka", translation: "粗末な薪でも" }),
+		];
+		const selected = selectWotdLexeme("nina", [fire, mash], examples);
+		expect(selected.ambiguous).toBe(false);
+		expect(selected.lexeme?.id).toBe("nina.vt");
+	});
+
+	test("a sense matching no example at all cannot win against a pool-attested one", () => {
+		const fire = lex({
+			id: "nina.vi",
+			lemma: "nina¹",
+			pos: "vi",
+			gloss_jp: ["薪を採る"],
+		});
+		const flat = lex({
+			id: "nina.n",
+			lemma: "nina",
+			gloss_jp: ["ヒラメ"],
+		});
+		const examples = [
+			row({ text: "nina ne", translation: "それだ" }),
+			row({ text: "nina kusu paye", translation: "薪を採りに行った" }),
+		];
+		const selected = selectWotdLexeme("nina", [fire, flat], examples);
+		expect(selected.ambiguous).toBe(false);
+		expect(selected.lexeme?.id).toBe("nina.vi");
+	});
+
+	test("a 2-char hiragana gloss run (する) no longer matches every translation", () => {
+		const doer = lex({ id: "a", lemma: "kar¹", gloss_jp: ["～する"] });
+		const maker = lex({ id: "b", lemma: "kar²", gloss_jp: ["～を作る"] });
+		const examples = [row({ text: "cise kar", translation: "家を作る" })];
+		const selected = selectWotdLexeme("kar", [doer, maker], examples);
+		expect(selected.ambiguous).toBe(false);
+		expect(selected.lexeme?.id).toBe("b");
+	});
+
+	test("a proper-name homograph is not a rival in filterExamplesBySense", () => {
+		const fire = lex({
+			id: "nina.vi",
+			lemma: "nina¹",
+			pos: "vi",
+			gloss_jp: ["薪を採る"],
+		});
+		const place = lex({
+			id: "nina.propn",
+			lemma: "Nina",
+			pos: "propn",
+			gloss_jp: ["荷菜"],
+		});
+		const examples = [row({ text: "nina un kur", translation: "荷菜の人" })];
+		expect(
+			filterExamplesBySense(examples, fire, [fire, place], "nina"),
+		).toEqual(examples);
+	});
+});

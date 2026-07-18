@@ -2,6 +2,7 @@ import type { CommandContext, Embed } from "discord-hono";
 import { baseEmbed } from "../lib/embeds.js";
 import type { AppEnv } from "../lib/errors.js";
 import { userMessage } from "../lib/errors.js";
+import { truncate } from "../lib/truncate.js";
 import {
 	type CorpusLang,
 	type CorpusRow,
@@ -15,10 +16,6 @@ const KWIC_CTX = 6;
 const KWIC_LEFT_WIDTH = 30;
 const FIELD_NAME_LIMIT = 256;
 const FIELD_VALUE_LIMIT = 1024;
-
-function truncate(text: string, limit: number): string {
-	return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
-}
 
 /** Left-pad (with a leading ellipsis if too long) so every node token lines
  * up in a fixed-width code block, matching a classic KWIC concordance view. */
