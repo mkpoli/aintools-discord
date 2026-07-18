@@ -368,12 +368,13 @@ export function filterExamplesBySense(
 		(row) => !row.bound && row.id !== lexeme.id,
 	);
 	if (rivals.length === 0) return [...examples];
-	const kept = examples.filter(
+	// When every example belongs to a rival sense, an empty result is correct —
+	// the embed renders "—" instead of a sentence under the wrong meaning.
+	return examples.filter(
 		(ex) =>
 			lexemeMatchesExampleContext(lexeme, [ex]) ||
 			!rivals.some((rival) => lexemeMatchesExampleContext(rival, [ex])),
 	);
-	return kept.length > 0 ? kept : examples.slice(0, 1);
 }
 
 function scriptsFieldValue(token: string): string {
@@ -397,14 +398,15 @@ export function exampleFieldValue(rows: readonly CorpusRow[]): string {
 	for (const row of rows) {
 		const formatted = formatExample(row);
 		const next = [...parts, formatted].join("\n\n");
-		// Skip an oversized example and keep scanning — a later, shorter one may
-		// still fit.
-		if (parts.length > 0 && next.length > EXAMPLE_FIELD_MAX) continue;
+		// Skip an oversized example — even a first one — and keep scanning: a
+		// later, shorter example may still fit whole.
+		if (next.length > EXAMPLE_FIELD_MAX) continue;
 		parts.push(formatted);
 	}
-	const joined = parts.join("\n\n");
-	if (joined.length <= EXAMPLE_FIELD_MAX) return joined;
-	const sliced = joined.slice(0, EXAMPLE_FIELD_MAX - 1);
+	if (parts.length > 0) return parts.join("\n\n");
+	// Every example alone exceeds the limit — truncate the first.
+	// biome-ignore lint/style/noNonNullAssertion: rows.length > 0 is checked above.
+	const sliced = formatExample(rows[0]!).slice(0, EXAMPLE_FIELD_MAX - 1);
 	// Never end on a lone high surrogate (astral char cut in half).
 	const safe = /[\uD800-\uDBFF]$/.test(sliced) ? sliced.slice(0, -1) : sliced;
 	return `${safe}…`;

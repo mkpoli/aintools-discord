@@ -499,6 +499,14 @@ describe("exampleFieldValue", () => {
 		expect(value).not.toContain("b".repeat(1010));
 	});
 
+	test("an oversized first example is skipped so a fitting later one leads", () => {
+		const rows = [row("b".repeat(1020)), row("c".repeat(100))];
+		const value = exampleFieldValue(rows);
+		expect(value.length).toBeLessThanOrEqual(1024);
+		expect(value).toContain("c".repeat(100));
+		expect(value).not.toContain("b".repeat(1020));
+	});
+
 	test("truncates a single oversized example without splitting a surrogate pair", () => {
 		const astral = "𩺊".repeat(600);
 		const value = exampleFieldValue([row(astral)]);
@@ -583,6 +591,16 @@ describe("filterExamplesBySense", () => {
 			"nina",
 		);
 		expect(kept).toHaveLength(2);
+	});
+
+	test("returns [] when every example belongs to a rival sense", () => {
+		const examples = [
+			ex("kem nina", "筋子をこねつぶす"),
+			ex("nina wa", "それをこねつぶす"),
+		];
+		expect(
+			filterExamplesBySense(examples, firewood, [firewood, mash], "nina"),
+		).toEqual([]);
 	});
 
 	test("is a no-op without a selected lexeme or without rivals", () => {
