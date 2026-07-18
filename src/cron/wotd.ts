@@ -620,5 +620,16 @@ export async function runWotd(
 			"[wotd] run failed — no history row written, will retry",
 			err,
 		);
+		// Surface the failure in the WOTD channel itself — an unnoticed missing
+		// post is worse than one error line. Best-effort: if Discord itself is
+		// what failed, this may fail too, and the console line above remains.
+		try {
+			const message = err instanceof Error ? err.message : String(err);
+			await c.rest("POST", $channels$_$messages, [channelId], {
+				content: `⚠️ 今日のアイヌ語の投稿に失敗しました。次回の実行で再試行します。 / Word-of-the-day failed and will retry on the next run.\n-# ${truncate(message, 200)}`,
+			});
+		} catch (reportErr) {
+			console.error("[wotd] failure report also failed", reportErr);
+		}
 	}
 }
