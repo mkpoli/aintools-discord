@@ -77,6 +77,7 @@ export const commands = [
 			{ name: "Vocab", value: "vocab" },
 			{ name: "Sentence", value: "sentence" },
 			{ name: "Mixed", value: "mixed" },
+			{ name: "Word of the day", value: "wotd" },
 		),
 		new Option(
 			"stats",

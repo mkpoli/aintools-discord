@@ -6,8 +6,9 @@
  * fully unit-testable with a seeded generator.
  */
 import type { CourseData, Sentence, Vocab } from "../data/types.js";
+import { blankToken, textContainsToken, wotdKey } from "../lib/fold.js";
 
-export type QuizMode = "vocab" | "sentence" | "mixed";
+export type QuizMode = "vocab" | "sentence" | "mixed" | "wotd";
 
 /**
  * Fine-grained question variant. This is deliberately more specific than
@@ -20,7 +21,8 @@ export type QuizKind =
 	| "vocab-g2l" // gloss shown, latin choices
 	| "sentence-blank" // fill-in-the-blank scaffold
 	| "sentence-convo" // conversation-reply scaffold
-	| "sentence-mc"; // no scaffold — translation multiple-choice
+	| "sentence-mc" // no scaffold — translation multiple-choice
+	| "wotd-blank"; // word-of-the-day blanked out of a fresh corpus sentence
 
 const QUIZ_KINDS: readonly QuizKind[] = [
 	"vocab-l2g",
@@ -28,6 +30,7 @@ const QUIZ_KINDS: readonly QuizKind[] = [
 	"sentence-blank",
 	"sentence-convo",
 	"sentence-mc",
+	"wotd-blank",
 ];
 
 function isQuizKind(value: string): value is QuizKind {
@@ -220,6 +223,50 @@ export function generateQuestion(
 	return buildSentenceQuestion(rng, course, pickRandom(rng, course.sentences));
 }
 
+export interface WotdQuizSource {
+	token: string;
+	/** Corpus sentences containing the token as a whole word (any is usable). */
+	examples: readonly { text: string; translation: string | null }[];
+	/** Distractor pool — corpus tokens other than the WOTD token. */
+	distractors: readonly string[];
+}
+
+/**
+ * A fill-in-the-blank over the word of the day: a corpus sentence with the
+ * token blanked, the (optional) translation as context, and 3 distractors.
+ * The daily post already revealed the meaning — this asks the reader to
+ * recognize the word inside a sentence instead of re-asking the gloss.
+ * Returns undefined when there is no usable sentence or too few distractors.
+ */
+export function generateWotdQuestion(
+	source: WotdQuizSource,
+	rng: () => number,
+): QuizQuestion | undefined {
+	const usable = source.examples.filter((ex) =>
+		textContainsToken(ex.text, source.token),
+	);
+	if (usable.length === 0) return undefined;
+	const pool = [
+		...new Set(
+			source.distractors.filter(
+				(d) => wotdKey(d) !== wotdKey(source.token) && wotdKey(d) !== "",
+			),
+		),
+	];
+	if (pool.length < 3) return undefined;
+	const example = pickRandom(rng, usable);
+	const distractors = shuffle(rng, pool).slice(0, 3);
+	const choices = shuffle(rng, [source.token, ...distractors]);
+	return {
+		kind: "wotd-blank",
+		itemId: source.token,
+		prompt: blankToken(example.text, source.token),
+		context: example.translation ?? undefined,
+		choices,
+		correctIndex: choices.indexOf(source.token),
+	};
+}
+
 export interface QuizAnswerReveal {
 	/** The correct choice, rendered the same way it would appear as a button label. */
 	correctAnswerText: string;
@@ -267,7 +314,7 @@ export function describeAnswer(
 
 const FIELD_SEP = ":";
 
-const QUIZ_MODES: readonly QuizMode[] = ["vocab", "sentence", "mixed"];
+const QUIZ_MODES: readonly QuizMode[] = ["vocab", "sentence", "mixed", "wotd"];
 
 export function isQuizMode(value: string): value is QuizMode {
 	return (QUIZ_MODES as readonly string[]).includes(value);

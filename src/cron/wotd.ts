@@ -23,6 +23,7 @@ import type { CronContext } from "discord-hono";
 import { $channels$_$messages } from "discord-hono";
 import { baseEmbed } from "../lib/embeds.js";
 import type { AppEnv } from "../lib/errors.js";
+import { normalizeAynu, textContainsToken, wotdKey } from "../lib/fold.js";
 import { fnv1a } from "../lib/hash.js";
 import { truncate } from "../lib/truncate.js";
 import { type CorpusRow, freqList, searchCorpus } from "../services/corpus.js";
@@ -194,23 +195,6 @@ export function selectExamples(
 	return picked;
 }
 
-/** NFC-normalize, casefold, and strip combining accents — mirrors glossary.ts's internal `fold`. */
-function normalizeAynu(s: string): string {
-	return s
-		.normalize("NFC")
-		.toLowerCase()
-		.normalize("NFD")
-		.replace(/\p{M}/gu, "");
-}
-
-/** Folded token used for exact sense matching; removes accents, case, and glottal apostrophes. */
-function wotdKey(s: string): string {
-	return normalizeAynu(s)
-		.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰0-9]+$/u, "")
-		.replace(/['’]/g, "")
-		.replace(/\s+/g, "");
-}
-
 /** The glossary row whose `Aynu` field exactly matches `token` (accent/case-insensitive), if any. */
 export function glossaryExactEntry(
 	table: GlossaryTable,
@@ -258,16 +242,7 @@ function tokenAppearsInExample(
 	token: string,
 ): boolean {
 	if (!row) return false;
-	const target = wotdKey(token);
-	// An all-punctuation token folds to "" and would match the empty parts the
-	// splitter yields around punctuation — never treat that as a hit.
-	if (target === "") return false;
-	// Split on NFC text and keep combining marks (\p{M}) word-internal: corpus
-	// rows stored in NFD would otherwise break at every accent (sí → s|i).
-	return row.text
-		.normalize("NFC")
-		.split(/[^\p{L}\p{M}'’]+/u)
-		.some((part) => wotdKey(part) === target);
+	return textContainsToken(row.text, token);
 }
 
 // Match Han, Katakana and Hiragana runs *separately* (never merged), so a
