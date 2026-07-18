@@ -3,7 +3,7 @@ import { runWotd } from "./cron/wotd.js";
 import { analyzeHandler } from "./handlers/analyze.js";
 import { askHandler } from "./handlers/ask.js";
 import { convert, convertScriptContextMenu } from "./handlers/convert.js";
-import { corpusHandler } from "./handlers/corpus.js";
+import { corpusDialectAutocomplete, corpusHandler } from "./handlers/corpus.js";
 import { glossaryAutocomplete, glossaryHandler } from "./handlers/glossary.js";
 import { lookupHandler } from "./handlers/lookup.js";
 import { quiz, quizAnswer, quizNext } from "./handlers/quiz.js";
@@ -14,7 +14,11 @@ const app = new DiscordHono<AppEnv>();
 
 app.command("convert", safeHandler(convert));
 app.command("Convert script", safeHandler(convertScriptContextMenu));
-app.command("corpus", safeHandler(corpusHandler));
+app.autocomplete(
+	"corpus",
+	corpusDialectAutocomplete,
+	safeHandler(corpusHandler),
+);
 app.command("analyze", safeHandler(analyzeHandler));
 app.autocomplete(
 	"glossary",

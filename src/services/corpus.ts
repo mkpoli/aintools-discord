@@ -78,6 +78,54 @@ export async function kwic(
 	return { lines: data, meta: { total: meta?.total ?? data.length } };
 }
 
+export interface DialectNode {
+	path: string;
+	name: string;
+	count: number;
+	areas?: DialectNode[];
+	dialects?: DialectNode[];
+}
+
+export interface DialectChoice {
+	name: string;
+	count: number;
+}
+
+/**
+ * `GET /v1/dialects` — hierarchical region → area → dialect tree with
+ * sentence counts. Cached per isolate: the tree changes only on corpus
+ * reloads, and autocomplete must answer within Discord's 3s budget.
+ */
+let dialectCache: { at: number; choices: DialectChoice[] } | undefined;
+const DIALECT_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+/** Flattens the tree to leaf dialect names with counts, most-attested first. */
+export function flattenDialects(tree: readonly DialectNode[]): DialectChoice[] {
+	const out: DialectChoice[] = [];
+	const walk = (node: DialectNode) => {
+		const children = [...(node.areas ?? []), ...(node.dialects ?? [])];
+		if (children.length === 0) {
+			if (node.name !== "(unknown)") {
+				out.push({ name: node.name, count: node.count });
+			}
+			return;
+		}
+		for (const child of children) walk(child);
+	};
+	for (const region of tree) walk(region);
+	return out.sort((a, b) => b.count - a.count);
+}
+
+export async function listDialects(env: Env): Promise<DialectChoice[]> {
+	if (dialectCache && Date.now() - dialectCache.at < DIALECT_CACHE_TTL_MS) {
+		return dialectCache.choices;
+	}
+	const tree = await getJson<DialectNode[]>(env, "CORPUS", "/v1/dialects");
+	const choices = flattenDialects(tree);
+	dialectCache = { at: Date.now(), choices };
+	return choices;
+}
+
 /**
  * `GET /v1/freq/list` — most-frequent already-normalized tokens, used by the
  * WOTD cron to source daily-word candidates. Contract verified against
