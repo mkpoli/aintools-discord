@@ -2,6 +2,7 @@ import type { CommandContext } from "discord-hono";
 import { baseEmbed } from "../lib/embeds.js";
 import type { AppEnv } from "../lib/errors.js";
 import { userMessage } from "../lib/errors.js";
+import { truncate } from "../lib/truncate.js";
 import {
 	type DecomposeMode,
 	decompose,
@@ -20,10 +21,6 @@ const FIELD_VALUE_LIMIT = 1024;
 interface EmbedField {
 	name: string;
 	value: string;
-}
-
-function truncate(text: string, limit: number): string {
-	return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
 /**
