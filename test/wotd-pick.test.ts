@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
 	exactLexemeRows,
+	exampleFieldValue,
 	filterCandidates,
+	filterExamplesBySense,
 	glossaryExactEntry,
 	isCandidateToken,
 	jstDateString,
@@ -388,12 +390,35 @@ describe("selectExamples", () => {
 		]);
 	});
 
-	test("matches the token accent- and apostrophe-insensitively", () => {
+	test("matches the token accent-, case- and apostrophe-insensitively", () => {
 		const rows = [row({ text: "hoski 'oman nanna" })];
 		expect(selectExamples(rows, "hoski")).toHaveLength(1);
+		expect(selectExamples(rows, "HOSKI")).toHaveLength(1);
+		expect(selectExamples(rows, "’oman")).toHaveLength(1);
+		expect(selectExamples(rows, "oman")).toHaveLength(1);
 		expect(selectExamples([row({ text: "sínep ne" })], "sinep")).toHaveLength(
 			1,
 		);
+	});
+
+	test("matches NFD-decomposed corpus text (combining accents are not word breaks)", () => {
+		// í as i + U+0301 — the splitter must not break sínep at the accent.
+		expect(
+			selectExamples([row({ text: "si\u0301nep ne" })], "sinep"),
+		).toHaveLength(1);
+	});
+
+	test("an all-punctuation token never matches (empty fold guard)", () => {
+		expect(selectExamples([row({ text: "hoski." })], "''")).toEqual([]);
+	});
+
+	test("drops rows repeating an already-picked sentence text", () => {
+		const rows = [
+			row({ text: "pet or ta", document: "A" }),
+			row({ text: "pet or ta", document: "B" }),
+			row({ text: "Pét or ta", document: "C" }),
+		];
+		expect(selectExamples(rows, "pet")).toHaveLength(1);
 	});
 
 	test("ignores rows with a null or blank translation", () => {
@@ -446,5 +471,127 @@ describe("selectExamples", () => {
 	test("returns [] when nothing usable matches", () => {
 		expect(selectExamples([], "pet")).toEqual([]);
 		expect(selectExamples([row({ text: "petpo" })], "pet")).toEqual([]);
+	});
+});
+
+describe("exampleFieldValue", () => {
+	const row = (text: string, translation = "訳"): CorpusRow => ({
+		id: text,
+		text,
+		translation,
+		dialect: "沙流",
+		author: null,
+		collection: null,
+		document: "doc",
+		uri: null,
+	});
+
+	test("skips an oversized example and still packs a later one that fits", () => {
+		const rows = [
+			row("a".repeat(100)),
+			row("b".repeat(1010)),
+			row("c".repeat(100)),
+		];
+		const value = exampleFieldValue(rows);
+		expect(value.length).toBeLessThanOrEqual(1024);
+		expect(value).toContain("a".repeat(100));
+		expect(value).toContain("c".repeat(100));
+		expect(value).not.toContain("b".repeat(1010));
+	});
+
+	test("truncates a single oversized example without splitting a surrogate pair", () => {
+		const astral = "𩺊".repeat(600);
+		const value = exampleFieldValue([row(astral)]);
+		expect(value.length).toBeLessThanOrEqual(1024);
+		expect(value.endsWith("…")).toBe(true);
+		expect(/[\uD800-\uDBFF]…$/.test(value)).toBe(false);
+	});
+
+	test("shows the collection when the document is missing", () => {
+		const value = exampleFieldValue([
+			{ ...row("pet or"), document: null, collection: "uwepeker 8" },
+		]);
+		expect(value).toContain("沙流 · uwepeker 8");
+	});
+
+	test("returns a dash for no examples", () => {
+		expect(exampleFieldValue([])).toBe("—");
+	});
+});
+
+describe("filterExamplesBySense", () => {
+	const lex = (
+		partial: Partial<MdbLexemeSearchRow> &
+			Pick<MdbLexemeSearchRow, "id" | "lemma">,
+	): MdbLexemeSearchRow => ({
+		kana: "",
+		pos: "n",
+		gloss_en: [],
+		gloss_jp: [],
+		bound: false,
+		dialects: [],
+		variations: [],
+		recordings: 0,
+		morphemes: [],
+		...partial,
+	});
+
+	const ex = (text: string, translation: string): CorpusRow => ({
+		id: text,
+		text,
+		translation,
+		dialect: null,
+		author: null,
+		collection: null,
+		document: null,
+		uri: null,
+	});
+
+	const firewood = lex({
+		id: "nina.vi",
+		lemma: "nina¹",
+		pos: "vi",
+		gloss_jp: ["薪を採る"],
+	});
+	const mash = lex({
+		id: "nina.vt",
+		lemma: "nina²",
+		pos: "vt",
+		gloss_jp: ["～をこねつぶす"],
+	});
+
+	test("drops an example that matches only a rival homograph sense", () => {
+		const examples = [
+			ex("nina an", "薪を採りに行く"),
+			ex("kem nina", "筋子をこねつぶす"),
+		];
+		const kept = filterExamplesBySense(
+			examples,
+			firewood,
+			[firewood, mash],
+			"nina",
+		);
+		expect(kept.map((e) => e.text)).toEqual(["nina an"]);
+	});
+
+	test("keeps examples with no decidable sense context", () => {
+		const examples = [ex("nina an", "薪を採る"), ex("nina ne", "それだ")];
+		const kept = filterExamplesBySense(
+			examples,
+			firewood,
+			[firewood, mash],
+			"nina",
+		);
+		expect(kept).toHaveLength(2);
+	});
+
+	test("is a no-op without a selected lexeme or without rivals", () => {
+		const examples = [ex("kem nina", "筋子をこねつぶす")];
+		expect(
+			filterExamplesBySense(examples, undefined, [firewood, mash], "nina"),
+		).toEqual(examples);
+		expect(
+			filterExamplesBySense(examples, firewood, [firewood], "nina"),
+		).toEqual(examples);
 	});
 });
