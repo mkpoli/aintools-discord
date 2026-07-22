@@ -143,6 +143,41 @@ export function probeForGlossaryHit(
 }
 
 /**
+ * Sentence-id prefixes (the collection slug before the first `/`) of corpus
+ * collections whose Ainu text is composed by modern writers — learner
+ * magazines, textbooks, institutional statements, SNS, translations — rather
+ * than recorded or written by native speakers. These rank after native
+ * attestations when picking examples. Unknown prefixes default to native.
+ */
+const MODERN_SOURCE_PREFIXES: ReadonlySet<string> = new Set([
+	"ainu-times",
+	"akor-itak",
+	"bible",
+	"bunpaku-2026",
+	"express-cd",
+	"express-new",
+	"express-special",
+	"hokudai-respect",
+	"ota-mondai",
+	"pilsudski",
+	"prague",
+	"upopoy-dict",
+	"upopoy-exhibits",
+	"upopoy-staffs",
+	"x-social",
+	"zaidan-benron",
+	"zaidan-radio",
+	"zaidan-textbooks",
+]);
+
+/** 0 = native-speaker attestation, 1 = modern composed text. */
+export function exampleSourceTier(row: CorpusRow): number {
+	const slash = row.id.indexOf("/");
+	const slug = slash === -1 ? row.id : row.id.slice(0, slash);
+	return MODERN_SOURCE_PREFIXES.has(slug) ? 1 : 0;
+}
+
+/**
  * A row's source identity for diversity: dialect + document, falling back to
  * collection. The separator stays in the key so a dialect-only "X" and a
  * document-only "X" remain distinct sources; rows with no metadata at all
@@ -157,9 +192,11 @@ function exampleSourceKey(row: CorpusRow): string {
  * Up to `max` example rows for `token`: only rows whose text contains `token`
  * as a whole word (the corpus search endpoint matches substrings, so `pet`
  * would otherwise surface `Yeepeta'usnaypo`) and that carry a non-empty
- * translation. Shorter sentences are preferred, and rows from a
- * dialect+document already represented are deferred until every distinct
- * source has one example, so a single narrator's tales don't fill the slate.
+ * translation. Native-speaker attestations rank before modern composed texts
+ * (`exampleSourceTier`), shorter sentences before longer within a tier, and
+ * rows from a dialect+document already represented are deferred until every
+ * distinct source has one example, so a single narrator's tales don't fill
+ * the slate.
  */
 export function selectExamples(
 	rows: readonly CorpusRow[],
@@ -169,7 +206,11 @@ export function selectExamples(
 	const usable = rows
 		.filter((row) => row.translation != null && row.translation.trim() !== "")
 		.filter((row) => tokenAppearsInExample(row, token))
-		.sort((a, b) => a.text.length - b.text.length);
+		.sort(
+			(a, b) =>
+				exampleSourceTier(a) - exampleSourceTier(b) ||
+				a.text.length - b.text.length,
+		);
 	const picked: CorpusRow[] = [];
 	const seenSources = new Set<string>();
 	// Text-level dedup happens inside the pick loops (never before them): the
@@ -314,7 +355,7 @@ export function selectWotdLexeme(
 	// Pool all examples first — a sense picked here must be attested somewhere
 	// in the slate, so a coincidental hit in one sentence can't decide alone.
 	// When several senses match the pool (each via a different sentence), the
-	// primary (shortest, shown first) example breaks the tie; if it can't,
+	// primary (first-ranked, shown first) example breaks the tie; if it can't,
 	// the homograph really is ambiguous.
 	const pooled = commonRows.filter((row) =>
 		lexemeMatchesExampleContext(row, examples),

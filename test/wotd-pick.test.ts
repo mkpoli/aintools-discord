@@ -446,6 +446,20 @@ describe("selectExamples", () => {
 		]);
 	});
 
+	test("ranks native-speaker attestations before modern composed texts", () => {
+		const rows = [
+			row({ text: "pet a", id: "ainu-times/019/2#1", dialect: "a" }),
+			row({ text: "pet bb", id: "zaidan-textbooks/x#1", dialect: "b" }),
+			row({ text: "pet cccc cccc cccc", id: "aa-irc/013#3", dialect: "c" }),
+			row({ text: "pet dddd dddd", id: "nabesawa/001#5", dialect: "d" }),
+		];
+		expect(selectExamples(rows, "pet", 3).map((r) => r.id)).toEqual([
+			"nabesawa/001#5",
+			"aa-irc/013#3",
+			"ainu-times/019/2#1",
+		]);
+	});
+
 	test("spreads picks across distinct dialect+document sources first", () => {
 		const rows = [
 			row({ text: "pet a", dialect: "小田洲", document: "人食いババ" }),
